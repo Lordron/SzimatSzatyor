@@ -23,6 +23,7 @@
 #include "ConsoleManager.h"
 #include "HookEntryManager.h"
 #include "HookManager.h"
+#include "FakePacket.h"
 
 #define CMSG 0x47534D43 // client to server, CMSG
 #define SMSG 0x47534D53 // server to client, SMSG
@@ -54,6 +55,8 @@ typedef DWORD (__thiscall *SendProto)(void*, void*, void*);
 
 // address of WoW's send function
 DWORD sendAddress = 0;
+DWORD baseAddress = 0;
+
 // global storage for the "the hooking" machine code which 
 // hooks client's send function
 BYTE machineCodeHookSend[JMP_INSTRUCTION_SIZE] = { 0 };
@@ -161,7 +164,7 @@ DWORD MainThreadControl(LPVOID /* param */)
     }
 
     // get the base address of the current process
-    DWORD baseAddress = (DWORD)GetModuleHandle(NULL);
+    baseAddress = (DWORD)GetModuleHandle(NULL);
 
     DWORD localeAddress = HookEntryManager::GetHookEntry(buildNumber).locale_AddressOffset;
     // locale stored in reversed string (enGB as BGne...)
@@ -195,6 +198,9 @@ DWORD MainThreadControl(LPVOID /* param */)
     HookManager::Hook(recvAddress, (DWORD)RecvHook, machineCodeHookRecv, defaultMachineCodeRecv);
     printf("Recv is hooked.\n");
 
+    FakePacket fake(baseAddress);
+    fake.SendCreatureQuery(100000);
+
     // loops until SIGINT (CTRL-C) occurs
     while (!isSigIntOccured)
         Sleep(50); // sleeps 50 ms to be nice
@@ -226,8 +232,8 @@ static void DumpPacket(DWORD packetType, DWORD connectionId, DWORD packetOpcode,
         PathRemoveFileSpec(dllPath);
         // fills the basic file name format
         _snprintf(fileName, MAX_PATH,
-                  "wowsniff_%s_%u_%d-%02d-%02d_%02d-%02d-%02d.pkt",
-                  locale, buildNumber,
+                  "%s\\wowsniff_%s_%u_%d-%02d-%02d_%02d-%02d-%02d.pkt",
+                  dllPath, locale, buildNumber,
                   date->tm_year + 1900,
                   date->tm_mon + 1,
                   date->tm_mday,
@@ -238,15 +244,12 @@ static void DumpPacket(DWORD packetType, DWORD connectionId, DWORD packetOpcode,
         // some info
         printf("Sniff dump: %s\n\n", fileName);
 
-        char fullFileName[MAX_PATH];
-        _snprintf(fullFileName, MAX_PATH, "%s\\%s", dllPath, fileName);
-
         WORD pkt_version    = PKT_VERSION;
         BYTE sniffer_id     = SNIFFER_ID;
         DWORD tickCount     = GetTickCount();
         BYTE sessionKey[40] = { 0 };
 
-        fileDump = fopen(fullFileName, "ab");
+        fileDump = fopen(fileName, "ab");
         // PKT 3.1 header
         fwrite("PKT",                         3, 1, fileDump);  // magic
         fwrite((WORD*)&pkt_version,           2, 1, fileDump);  // major.minor version
