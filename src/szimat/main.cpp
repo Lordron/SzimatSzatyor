@@ -232,8 +232,8 @@ static void DumpPacket(DWORD packetType, DWORD connectionId, DWORD packetOpcode,
         PathRemoveFileSpec(dllPath);
         // fills the basic file name format
         _snprintf(fileName, MAX_PATH,
-                  "%s\\wowsniff_%s_%u_%d-%02d-%02d_%02d-%02d-%02d.pkt",
-                  dllPath, locale, buildNumber,
+                  "wowsniff_%s_%u_%d-%02d-%02d_%02d-%02d-%02d.pkt",
+                  locale, buildNumber,
                   date->tm_year + 1900,
                   date->tm_mon + 1,
                   date->tm_mday,
@@ -244,12 +244,15 @@ static void DumpPacket(DWORD packetType, DWORD connectionId, DWORD packetOpcode,
         // some info
         printf("Sniff dump: %s\n\n", fileName);
 
+        char fullFileName[MAX_PATH];
+        _snprintf(fullFileName, MAX_PATH, "%s\\%s", dllPath, fileName);
+
         WORD pkt_version    = PKT_VERSION;
         BYTE sniffer_id     = SNIFFER_ID;
         DWORD tickCount     = GetTickCount();
         BYTE sessionKey[40] = { 0 };
 
-        fileDump = fopen(fileName, "ab");
+        fileDump = fopen(fullFileName, "ab");
         // PKT 3.1 header
         fwrite("PKT",                         3, 1, fileDump);  // magic
         fwrite((WORD*)&pkt_version,           2, 1, fileDump);  // major.minor version
