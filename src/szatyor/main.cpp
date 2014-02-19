@@ -223,11 +223,9 @@ PIDList GetProcessIDsByName(const char* processName)
     }
 
     // a 32 bit process entry from a snapshot
-    PROCESSENTRY32 processEntry;
+    PROCESSENTRY32 processEntry = { sizeof(PROCESSENTRY32) };
     // from MSDN: The calling application must set the
     // dwSize member of PROCESSENTRY32 to the size, in bytes, of the structure.
-    processEntry.dwSize = sizeof(PROCESSENTRY32);
-
     // checks the first process from the snapshot
     if (Process32First(hSnapshot, &processEntry))
     {

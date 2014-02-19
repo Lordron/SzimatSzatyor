@@ -19,6 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CDataStore.h" />
+    <ClInclude Include="ClientServices.h" />
     <ClInclude Include="ConsoleManager.h" />
     <ClInclude Include="FakePacket.h" />
     <ClInclude Include="HookManager.h" />
