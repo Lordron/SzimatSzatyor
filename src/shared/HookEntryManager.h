@@ -19,42 +19,15 @@
 #include <wtypes.h>
 #include <map>
 
-#define PKT_VERSION     0x0301
-#define SNIFFER_ID      15
-// todo: use it
-#define CLIENT_BUILD    17688
-#define SEND2           0x3988D7
-#define PROCESS_MESSAGE 0x3965BB
-#define CLEINET_LOCALE  0xE7080C
+// Create HookEntry
+// * build  - Client build
+// * send2  - Address NetClient_Send2 function
+// * pm     - Address NetClient_ProcessMessage function
+// * locale - Address locale
+#define FILL_OFFSET(build, send2, pm, locale) _hookEntryMap[(build)] = HookEntry((send2), (pm), (locale))
 
-#define FILL_OFFSET(build, send2, processMessage, locale) _hookEntryMap[(build)] = HookEntry((send2), (processMessage), (locale))
-
-// list of supported client build numbers
-#define WOW_CLASS_5875  5875
-#define WOW_TBC_8606    8606
-#define WOW_WLK_12340   12340
-#define WOW_CATA_13623  13623
-#define WOW_CATA_15595  15595
-#define WOW_MOP_16135   16135
-#define WOW_MOP_16357   16357
-#define WOW_MOP_16650   16650
-#define WOW_MOP_16709   16709
-#define WOW_MOP_16826   16826
-#define WOW_MOP_16981   16981
-#define WOW_MOP_16983   16983
-#define WOW_MOP_16992   16992
-#define WOW_MOP_17055   17055
-#define WOW_MOP_17056   17056
-#define WOW_MOP_17093   17093
-#define WOW_MOP_17116   17116
-#define WOW_MOP_17124   17124
-#define WOW_MOP_17128   17128
-#define WOW_MOP_17359   17359
-#define WOW_MOP_17371   17371
-#define WOW_MOP_17399   17399
-#define WOW_MOP_17538   17538
-#define WOW_MOP_17658   17658
-#define WOW_MOP_17688   17688
+#define WOW_TBC_8606  8606
+#define WOW_MOP_16135 16135
 
 // stores and manages hook entries
 // this will be compiled into a static lib
@@ -108,36 +81,39 @@ public:
     // this is some kind of initialization of the class
     static void FillHookEntries()
     {
-        //             build          send2     pm     locale
-        FILL_OFFSET(WOW_CLASS_5875, 0x1B5630, 0x137AA0, 0);
-
-        FILL_OFFSET(WOW_TBC_8606,   0x0203B0, 0x15F440, 0);
-
-        FILL_OFFSET(WOW_WLK_12340,  0x0675F0, 0x231FE0, 0);
-
-        FILL_OFFSET(WOW_CATA_13623, 0x15EF20, 0x090360, 0);
-        FILL_OFFSET(WOW_CATA_15595, 0x089590, 0x0873D0, 0);
-
-        FILL_OFFSET(WOW_MOP_16135,  0x3F9AE0, 0x3F7710, 0);
-        FILL_OFFSET(WOW_MOP_16357,  0x40C5D0, 0x40A210, 0);
-        FILL_OFFSET(WOW_MOP_16650,  0x448D10, 0x446720, 0);
-        FILL_OFFSET(WOW_MOP_16709,  0x448FB0, 0x446A00, 0);
-        FILL_OFFSET(WOW_MOP_16826,  0x448E40, 0x446880, 0);
-        FILL_OFFSET(WOW_MOP_16981,  0x363B57, 0x361C6D, 0);
-        FILL_OFFSET(WOW_MOP_16983,  0x36400D, 0x362123, 0);
-        FILL_OFFSET(WOW_MOP_16992,  0x36424A, 0x362360, 0);
-        FILL_OFFSET(WOW_MOP_17055,  0x363F76, 0x36206E, 0);
-        FILL_OFFSET(WOW_MOP_17056,  0x3E43D9, 0x3E1ECC, 0);
-        FILL_OFFSET(WOW_MOP_17093,  0x3EED60, 0x3EC853, 0);
-        FILL_OFFSET(WOW_MOP_17116,  0x364654, 0x36276A, 0);
-        FILL_OFFSET(WOW_MOP_17124,  0x3F3B0F, 0x3F1490, 0);
-        FILL_OFFSET(WOW_MOP_17128,  0x363C88, 0x361D9B, 0);
-        FILL_OFFSET(WOW_MOP_17359,  0x391942, 0x38F9C5, 0);
-        FILL_OFFSET(WOW_MOP_17371,  0x39192A, 0x38F9AD, 0);
-        FILL_OFFSET(WOW_MOP_17399,  0x39199E, 0x38FA21, 0);
-        FILL_OFFSET(WOW_MOP_17538,  0x38F1A9, 0x38D225, 0);
-        FILL_OFFSET(WOW_MOP_17658,  0x3988D7, 0x3965BB, 0xE7080C);
-        FILL_OFFSET(WOW_MOP_17688,  0x3988D7, 0x3965BB, 0xE7080C);
+        //          build    send2     pm     locale
+        // clasic
+        FILL_OFFSET(5875,  0x1B5630, 0x137AA0, 0);
+        // tbc
+        FILL_OFFSET(8606,  0x0203B0, 0x15F440, 0);
+        // wotlk
+        FILL_OFFSET(12340, 0x0675F0, 0x231FE0, 0);
+        // cata
+        FILL_OFFSET(13623, 0x15EF20, 0x090360, 0);
+        FILL_OFFSET(15595, 0x089590, 0x0873D0, 0);
+        // mop
+        FILL_OFFSET(16135, 0x3F9AE0, 0x3F7710, 0);
+        FILL_OFFSET(16357, 0x40C5D0, 0x40A210, 0);
+        FILL_OFFSET(16650, 0x448D10, 0x446720, 0);
+        FILL_OFFSET(16709, 0x448FB0, 0x446A00, 0);
+        FILL_OFFSET(16826, 0x448E40, 0x446880, 0);
+        FILL_OFFSET(16981, 0x363B57, 0x361C6D, 0);
+        FILL_OFFSET(16983, 0x36400D, 0x362123, 0);
+        FILL_OFFSET(16992, 0x36424A, 0x362360, 0);
+        FILL_OFFSET(17055, 0x363F76, 0x36206E, 0);
+        FILL_OFFSET(17056, 0x3E43D9, 0x3E1ECC, 0);
+        FILL_OFFSET(17093, 0x3EED60, 0x3EC853, 0);
+        FILL_OFFSET(17116, 0x364654, 0x36276A, 0);
+        FILL_OFFSET(17124, 0x3F3B0F, 0x3F1490, 0);
+        FILL_OFFSET(17128, 0x363C88, 0x361D9B, 0);
+        FILL_OFFSET(17359, 0x391942, 0x38F9C5, 0);
+        FILL_OFFSET(17371, 0x39192A, 0x38F9AD, 0);
+        FILL_OFFSET(17399, 0x39199E, 0x38FA21, 0);
+        FILL_OFFSET(17538, 0x38F1A9, 0x38D225, 0);
+        FILL_OFFSET(17658, 0x3988D7, 0x3965BB, 0xE7080C);
+        FILL_OFFSET(17688, 0x3988D7, 0x3965BB, 0xE7080C);
+        FILL_OFFSET(17898, 0x399B6A, 0x3979B2, 0xE73344);
+        FILL_OFFSET(17930, 0x39A93E, 0x398786, 0xE75344);
     }
 
     // returns true if hook entry exists for this specified build number
