@@ -24,6 +24,7 @@
 #include "HookEntryManager.h"
 #include "HookManager.h"
 #include "FakePacket.h"
+#include "def.h"
 
 #define PKT_VERSION 0x0301
 #define SNIFFER_ID  15
@@ -36,8 +37,6 @@ volatile bool* ConsoleManager::_sniffingLoopCondition = NULL;
 
 // needed to correctly shutdown the sniffer
 HINSTANCE instanceDLL = NULL;
-// true when a SIGINT occured
-volatile bool isSigIntOccured = false;
 
 // global access to the build number
 WORD buildNumber = 0;
@@ -58,7 +57,6 @@ typedef DWORD (__thiscall *SendProto)(void*, void*, void*);
 
 // address of WoW's send function
 DWORD sendAddress = 0;
-DWORD baseAddress = 0;
 
 // global storage for the "the hooking" machine code which 
 // hooks client's send function
@@ -201,8 +199,9 @@ DWORD MainThreadControl(LPVOID /* param */)
     HookManager::Hook(recvAddress, (DWORD)RecvHook, machineCodeHookRecv, defaultMachineCodeRecv);
     printf("Recv is hooked.\n");
 
-    FakePacket fake(baseAddress);
+    FakePacket fake(0);
     fake.SendCreatureQuery(100000);
+    fake.SendQuestPOIQuery(50000);
 
     // loops until SIGINT (CTRL-C) occurs
     while (!isSigIntOccured)

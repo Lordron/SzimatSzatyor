@@ -114,6 +114,7 @@ public:
         FILL_OFFSET(17688, 0x3988D7, 0x3965BB, 0xE7080C);
         FILL_OFFSET(17898, 0x399B6A, 0x3979B2, 0xE73344);
         FILL_OFFSET(17930, 0x39A93E, 0x398786, 0xE75344);
+        FILL_OFFSET(17956, 0x39A66A, 0x398482, 0xE75344);
     }
 
     // returns true if hook entry exists for this specified build number
