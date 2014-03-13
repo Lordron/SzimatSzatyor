@@ -17,9 +17,7 @@
 
 #include "HookEntryManager.h"
 #include <psapi.h>
-
-// static member initilization
-std::map<WORD, HookEntryManager::HookEntry> HookEntryManager::_hookEntryMap;
+#include <Shlwapi.h>
 
 /* static */
 WORD HookEntryManager::GetBuildNumberFromProcess(HANDLE hProcess /* = NULL */)
@@ -36,14 +34,10 @@ WORD HookEntryManager::GetBuildNumberFromProcess(HANDLE hProcess /* = NULL */)
     // gets the path of an external process' executable
     // param process should NOT be NULL in the injector
     else
-        processExePathSize = GetModuleFileNameEx(hProcess,
-                                                 NULL,
-                                                 processExePath,
-                                                 MAX_PATH);
+        processExePathSize = GetModuleFileNameEx(hProcess, NULL, processExePath, MAX_PATH);
     if (!processExePathSize)
     {
-        printf("ERROR: Can't get path of the process' exe, ErrorCode: %u\n",
-               GetLastError());
+        printf("ERROR: Can't get path of the process' exe, ErrorCode: %u\n", GetLastError());
         return 0;
     }
     printf("ExePath: %s\n", processExePath);
@@ -60,13 +54,9 @@ WORD HookEntryManager::GetBuildNumberFromProcess(HANDLE hProcess /* = NULL */)
     // allocates memory for file version info
     BYTE* fileVersionInfoBuffer = new BYTE[fileVersionInfoSize];
     // gets the file version info
-    if (!GetFileVersionInfo(processExePath,
-                            0,
-                            fileVersionInfoSize,
-                            fileVersionInfoBuffer))
+    if (!GetFileVersionInfo(processExePath, 0, fileVersionInfoSize, fileVersionInfoBuffer))
     {
-        printf("ERROR: Can't get file version info, ErrorCode: %u\n",
-               GetLastError());
+        printf("ERROR: Can't get file version info, ErrorCode: %u\n", GetLastError());
         delete [] fileVersionInfoBuffer;
         return 0;
     }
@@ -88,4 +78,31 @@ WORD HookEntryManager::GetBuildNumberFromProcess(HANDLE hProcess /* = NULL */)
     WORD buildNumber = fileInfo->dwFileVersionLS & 0xFFFF;
     delete [] fileVersionInfoBuffer;
     return buildNumber;
+}
+
+bool HookEntryManager::GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry)
+{
+    char ret[20];
+    char fileName[MAX_PATH];
+    char dllPath[MAX_PATH];
+    char section[6];
+
+    GetModuleFileName((HMODULE)moduleHandle, dllPath, MAX_PATH);
+    // removes the DLL name from the path
+    PathRemoveFileSpec(dllPath);
+
+    _snprintf(fileName, MAX_PATH, "%s\\offsets.ini", dllPath);
+    _snprintf(section, 6, "%i", build);
+
+    if (!GetPrivateProfileString(section, "send", "0", ret, 20, fileName))
+        return FALSE;
+    entry->send = strtol(ret, 0, 0);
+
+    GetPrivateProfileString(section, "recive", "0", ret, 20, fileName);
+    entry->recive = strtol(ret, 0, 0);
+
+    GetPrivateProfileString(section, "locale", "0", ret, 20, fileName);
+    entry->locale = strtol(ret, 0, 0);
+
+    return entry->recive != 0 && entry->send != 0;
 }

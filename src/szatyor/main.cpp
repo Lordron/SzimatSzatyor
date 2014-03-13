@@ -148,8 +148,7 @@ int main(int argc, char* argv[])
             // 0 or non int used
             else if (selectedIndex == 0)
             {
-                printf("Your index is invalid, 1-%u should be used.\n",
-                       idx - 1);
+                printf("Your index is invalid, 1-%u should be used.\n", idx - 1);
                 continue;
             }
 
@@ -328,14 +327,7 @@ HANDLE OpenClientProcess(DWORD processID)
             PSECURITY_DESCRIPTOR securityDescriptor;
 
             // gets injector's security descriptor
-            error = GetSecurityInfo(GetCurrentProcess(),
-                                    SE_KERNEL_OBJECT,
-                                    DACL_SECURITY_INFORMATION,
-                                    NULL,
-                                    NULL,
-                                    &dacl,
-                                    NULL,
-                                    &securityDescriptor);
+            error = GetSecurityInfo(GetCurrentProcess(), SE_KERNEL_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, &dacl, NULL, &securityDescriptor);
             if (error)
             {
                 printf("ERROR: Can't get injector's security secriptor, ");
@@ -355,14 +347,7 @@ HANDLE OpenClientProcess(DWORD processID)
             }
 
             // overrides client's DACL with injector's DACL
-            error = SetSecurityInfo(hProcess,
-                                    SE_KERNEL_OBJECT,
-                                    DACL_SECURITY_INFORMATION |
-                                    UNPROTECTED_DACL_SECURITY_INFORMATION,
-                                    0,
-                                    0,
-                                    dacl,
-                                    0);
+            error = SetSecurityInfo(hProcess, SE_KERNEL_OBJECT, DACL_SECURITY_INFORMATION | UNPROTECTED_DACL_SECURITY_INFORMATION, 0, 0, dacl, 0);
             if (error)
             {
                 LocalFree(securityDescriptor);
@@ -415,15 +400,10 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     HANDLE hProcess = OpenClientProcess(processID);
     if (!hProcess)
     {
-        printf("Process [%u] '%s' open is failed.\n",
-               processID,
-               lookingProcessName);
+        printf("Process [%u] '%s' open is failed.\n", processID, lookingProcessName);
         return false;
     }
     printf("\nProcess [%u] '%s' is opened.\n", processID, lookingProcessName);
-
-    // inits the HookManager
-    HookEntryManager::FillHookEntries();
 
     // gets the build number
     WORD buildNumber = HookEntryManager::GetBuildNumberFromProcess(hProcess);
@@ -437,7 +417,7 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     printf("Detected build number: %hu\n", buildNumber);
 
     // checks this build is supported or not
-    if (!HookEntryManager::IsHookEntryExists(buildNumber))
+    if (!HookEntryManager::IsHookEntryExists(NULL, buildNumber))
     {
         printf("ERROR: This build number is not supported.\n");
         CloseHandle(hProcess);
@@ -445,11 +425,7 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     }
 
     // allocates memory for the DLL location string
-    LPVOID allocatedMemoryAddress = VirtualAllocEx(hProcess,
-                                                   NULL,
-                                                   strlen(dllLocation),
-                                                   MEM_COMMIT,
-                                                   PAGE_READWRITE);
+    LPVOID allocatedMemoryAddress = VirtualAllocEx(hProcess, NULL, strlen(dllLocation), MEM_COMMIT, PAGE_READWRITE);
     if (!allocatedMemoryAddress)
     {
         printf("ERROR: Virtual memory allocation is failed, ");
@@ -460,11 +436,7 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
 
     // writes the DLL location string to the process
     // so this is the parameter which will be passed to LoadLibraryA
-    if (!WriteProcessMemory(hProcess,
-                            allocatedMemoryAddress,
-                            dllLocation,
-                            strlen(dllLocation),
-                            NULL))
+    if (!WriteProcessMemory(hProcess, allocatedMemoryAddress, dllLocation, strlen(dllLocation), NULL))
     {
         printf("ERROR: Process memory writing is failed, ");
         printf("ErrorCode: %u\n", GetLastError());
@@ -476,14 +448,7 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     // creates a thread that runs in the virtual address space of
     // the process which should be injected and gives the
     // parameter (allocatedMemoryAddress) to LoadLibraryA(loadLibraryAddress)
-    HANDLE hRemoteThread = CreateRemoteThread(hProcess,
-                                              NULL,
-                                              0,
-                                              (LPTHREAD_START_ROUTINE)
-                                              loadLibraryAddress,
-                                              allocatedMemoryAddress,
-                                              0,
-                                              NULL);
+    HANDLE hRemoteThread = CreateRemoteThread(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)loadLibraryAddress, allocatedMemoryAddress, 0, NULL);
     if (!hRemoteThread)
     {
         printf("ERROR: Remote thread creation is failed, ");

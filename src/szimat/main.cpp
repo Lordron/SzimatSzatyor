@@ -142,9 +142,6 @@ DWORD MainThreadControl(LPVOID /* param */)
     printf("Note: you can simply re-attach the sniffer without ");
     printf("restarting the WoW.\n\n");
 
-    // inits the HookManager
-    HookEntryManager::FillHookEntries();
-
     // gets the build number
     buildNumber = HookEntryManager::GetBuildNumberFromProcess();
     // error occured
@@ -156,8 +153,9 @@ DWORD MainThreadControl(LPVOID /* param */)
     }
     printf("Detected build number: %hu\n", buildNumber);
 
+    HookEntryManager::HookEntry hookEntry;
     // checks this build is supported or not
-    if (!HookEntryManager::IsHookEntryExists(buildNumber))
+    if (!HookEntryManager::GetOffsets(instanceDLL, buildNumber, &hookEntry))
     {
         printf("ERROR: This build number is not supported.\n\n");
         system("pause");
@@ -167,7 +165,7 @@ DWORD MainThreadControl(LPVOID /* param */)
     // get the base address of the current process
     baseAddress = (DWORD)GetModuleHandle(NULL);
 
-    DWORD localeAddress = HookEntryManager::GetHookEntry(buildNumber).locale_AddressOffset;
+    DWORD localeAddress = hookEntry.locale;
     // locale stored in reversed string (enGB as BGne...)
     if (localeAddress)
     {
@@ -188,13 +186,13 @@ DWORD MainThreadControl(LPVOID /* param */)
     printf("\nDLL path: %s\n", dllPath);
 
     // gets address of NetClient::Send2
-    sendAddress = baseAddress + HookEntryManager::GetHookEntry(buildNumber).send2_AddressOffset;
+    sendAddress = baseAddress + hookEntry.send;
     // hooks client's send function
     HookManager::Hook(sendAddress, (DWORD)SendHook, machineCodeHookSend, defaultMachineCodeSend);
     printf("Send is hooked.\n");
 
     // gets address of NetClient::ProcessMessage
-    recvAddress = baseAddress + HookEntryManager::GetHookEntry(buildNumber).processMessage_AddressOffset;
+    recvAddress = baseAddress + hookEntry.recive;
     // hooks client's recv function
     HookManager::Hook(recvAddress, (DWORD)RecvHook, machineCodeHookRecv, defaultMachineCodeRecv);
     printf("Recv is hooked.\n");

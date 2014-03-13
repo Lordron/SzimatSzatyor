@@ -24,6 +24,9 @@
   <ItemGroup>
     <ClInclude Include="HookEntryManager.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="offsets.ini" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGUID>{EC23EF6D-F9A6-4583-ADCD-81ADD233F26F}</ProjectGUID>
     <Keyword>Win32Proj</Keyword>
