@@ -358,53 +358,34 @@ void SendCreatureQuery(int max_entry)
 
 
 // full quest_poi_query
-// offsets
-#define CMSG_QUEST_POI_QUERY  0x0
-#define INIT_QUEST_POI_QUERY  0x0
-#define CDATA_STORE_PUT_INT32 0x0
-#define CDATA_STORE_FINALIZE  0x0
+#define CMSG_QUEST_POI_QUERY  0x0 // opcode
 #define CLIENT_SERVICES_SEND2 0x0
 // proto
-typedef CDataStore* (__thiscall *InitializePtr) (CDataStore *pData);
-typedef void(__cdecl *SendQuestPoiQuery)        (CDataStore *pData);
-typedef CDataStore& (__thiscall *PutInt32Ptr)   (CDataStore *pData, DWORD value);
-typedef void(__thiscall *DestroyPtr)            (CDataStore *pData);
+typedef void(__cdecl *Send2)(CDataStore *pData);
 
-/*
-QuestPoi::InitSend(&poiPacket);
-if ( v29 > (unsigned int)v2 )
-{
-    questListPtr = (int)a3;
-    do
-    {
-        QuestPoi::FillQuestList(&thisa, 1, questListPtr);
-        questListPtr += 4;
-        --v29;
-    }
-    while ( v29 );
-}
-QuestPoi::Send((CDataStore *)&poiPacket);
-QuestPoi::ReleasePacket(&poiPacket);  // destroy ???
-*/
 void SendQuestPOIQuery(int max_entry)
 {
     int count = 20;
+    CDataStore packet = CDataStore();
     for (int entry = 1; entry < max_entry;)
     {
-        CDataStore packet;
+        packet.size = 4 + 4 + 20 * 4;
+        packet.read = 0;
+        packet.buffer = (BYTE*)malloc(packet.size);
 
-        InitializePtr(baseAddress + 0)(&packet);
-
-        PutInt32Ptr(baseAddress + CDATA_STORE_PUT_INT32)(&packet, CMSG_QUEST_POI_QUERY);
-        PutInt32Ptr(baseAddress + CDATA_STORE_PUT_INT32)(&packet, count * 4); // 22 bit
+        // write opcode
+        *(DWORD*)(packet.buffer + 0) = CMSG_QUEST_POI_QUERY;
+        *(DWORD*)(packet.buffer + 4) = count << 2; // 22 bits
 
         for (int i = 0; i < count; ++i, ++entry)
         {
-            PutInt32Ptr(baseAddress + CDATA_STORE_PUT_INT32)(&packet, entry);
+            *(DWORD*)((packet.buffer + 8) + (i * 4)) = entry;
         }
 
         printf("Send packet CMSG_QUEST_POI_QUERY, entry %i\n", entry);
-        SendQuestPoiQuery(baseAddress + CLIENT_SERVICES_SEND2)(&packet);
+        Send2(baseAddress + CLIENT_SERVICES_SEND2)(&packet);
+
+        free(packet.buffer);
 
         if (isSigIntOccured)
             break;
