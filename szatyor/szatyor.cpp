@@ -1,36 +1,30 @@
 /*
- * This file is part of SzimatSzatyor.
- *
- * SzimatSzatyor is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+* This file is part of SzimatSzatyor.
+*
+* SzimatSzatyor is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
 
- * SzimatSzatyor is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+* SzimatSzatyor is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
 
- * You should have received a copy of the GNU General Public License
- * along with SzimatSzatyor.  If not, see <http://www.gnu.org/licenses/>.
- */
+* You should have received a copy of the GNU General Public License
+* along with SzimatSzatyor.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #include <Windows.h>
 #include <TlHelp32.h>
-#include <psapi.h>
 #include <Aclapi.h>
-#include <Shlwapi.h>
-
-#include <cstring>
 #include <cstdio>
 #include <list>
-#include <algorithm>
-
-#include "HookEntryManager.h"
+#include "..\szimat\Shared.h"
 
 // default name of the process which will be hooked
 const char* lookingProcessName = "Wow.exe";
- // this DLL will be injected
+// this DLL will be injected
 const char injectDLLName[] = "szimat.dll";
 
 // this module contains function loadDLLFunctionName
@@ -178,7 +172,7 @@ int main(int argc, char* argv[])
     if (!injectorPathSize)
     {
         printf("ERROR: Can't get the injector's path, ");
-        printf("ErrorCode: %u\n\n",  GetLastError());
+        printf("ErrorCode: %u\n\n", GetLastError());
         system("pause");
         return 0;
     }
@@ -201,7 +195,7 @@ int main(int argc, char* argv[])
     else
         printf("\nInjection of '%s' is NOT successful.\n\n", injectDLLName);
 
-    delete [] dllPath;
+    delete[] dllPath;
 
     //system("pause");
     return 0;
@@ -297,8 +291,8 @@ HANDLE OpenClientProcess(DWORD processID)
     // tries to open the targeted process
     // note: don't use PROCESS_ALL_ACCESS
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ |
-                                  PROCESS_VM_WRITE |PROCESS_QUERY_INFORMATION |
-                                  PROCESS_CREATE_THREAD, FALSE, processID);
+        PROCESS_VM_WRITE | PROCESS_QUERY_INFORMATION |
+        PROCESS_CREATE_THREAD, FALSE, processID);
     // error?
     if (!hProcess)
     {
@@ -406,7 +400,7 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     printf("\nProcess [%u] '%s' is opened.\n", processID, lookingProcessName);
 
     // gets the build number
-    WORD buildNumber = HookEntryManager::GetBuildNumberFromProcess(hProcess);
+    WORD buildNumber = GetBuildNumberFromProcess(hProcess);
     // error occured
     if (!buildNumber)
     {
@@ -417,7 +411,7 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     printf("Detected build number: %hu\n", buildNumber);
 
     // checks this build is supported or not
-    if (!HookEntryManager::IsHookEntryExists(NULL, buildNumber))
+    if (!IsHookEntryExists(NULL, buildNumber))
     {
         printf("ERROR: This build number is not supported.\n");
         CloseHandle(hProcess);
