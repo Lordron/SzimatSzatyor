@@ -15,79 +15,7 @@
 * along with SzimatSzatyor.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <Windows.h>
-#include <Shlwapi.h>
-#include <cstdio>
-#include <ctime>
-#include "ConsoleManager.h"
-#include "Shared.h"
-#include "HookManager.h"
-
-#define PKT_VERSION 0x0301
-#define SNIFFER_ID  15
-
-#define CMSG 0x47534D43 // client to server, CMSG
-#define SMSG 0x47534D53 // server to client, SMSG
-
-// static member initilization
-volatile bool* ConsoleManager::_sniffingLoopCondition = NULL;
-
-// needed to correctly shutdown the sniffer
-HINSTANCE instanceDLL = NULL;
-// true when a SIGINT occured
-volatile bool isSigIntOccured = false;
-
-// global access to the build number
-WORD buildNumber = 0;
-char locale[5] = { 'x', 'x', 'X', 'X', '\0' };
-HookEntry hookEntry;
-
-// this function will be called when send called in the client
-// client has thiscall calling convention
-// that means: this pointer is passed via the ECX register
-// fastcall convention means that the first 2 parameters is passed
-// via ECX and EDX registers so the first param will be the this pointer and
-// the second one is just a dummy (not used)
-DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, CDataStore* /* dataStore */, void* /* param2 */);
-// this send prototype fits with the client's one
-typedef DWORD(__thiscall *SendProto)(void*, void*, void*);
-
-// address of WoW's send function
-DWORD sendAddress = 0;
-// global storage for the "the hooking" machine code which 
-// hooks client's send function
-BYTE machineCodeHookSend[JMP_INSTRUCTION_SIZE] = { 0 };
-// global storage which stores the
-// untouched first 5 bytes machine code from the client's send function
-BYTE defaultMachineCodeSend[JMP_INSTRUCTION_SIZE] = { 0 };
-
-// this function will be called when recv called in the client
-DWORD __fastcall RecvHook(void* thisPTR, void* /* dummy */, void* /* param1 */, CDataStore* /* dataStore */, void* /* param3 */);
-// this recv prototype fits with the client's one
-typedef DWORD(__thiscall *RecvProto)(void*, void*, void*, void*);
-// clients which has build number <= 8606 have different prototype
-typedef DWORD(__thiscall *RecvProto8606)(void*, void*, void*);
-
-// address of WoW's recv function
-DWORD recvAddress = 0;
-// global storage for the "the hooking" machine code which
-// hooks client's recv function
-BYTE machineCodeHookRecv[JMP_INSTRUCTION_SIZE] = { 0 };
-// global storage which stores the
-// untouched first 5 bytes machine code from the client's recv function
-BYTE defaultMachineCodeRecv[JMP_INSTRUCTION_SIZE] = { 0 };
-
-// these are false if "hook functions" don't called yet
-// and they are true if already called at least once
-bool sendHookGood = false;
-bool recvHookGood = false;
-
-// basically this method controls what the sniffer should do
-// pretty much like a "main method"
-DWORD MainThreadControl(LPVOID /* param */);
-
-char dllPath[MAX_PATH] = { 0 };
-FILE* fileDump = 0;
+#include "szimat.h"
 
 // entry point of the DLL
 BOOL APIENTRY DllMain(HINSTANCE instDLL, DWORD reason, LPVOID /* reserved */)
@@ -203,6 +131,18 @@ DWORD MainThreadControl(LPVOID /* param */)
     return 0;
 }
 
+DWORD GetConnectionIndex(DWORD connectionAddress)
+{
+    for (int i = 1; i <= ConnectionList.size(); ++i)
+    {
+        if (ConnectionList[i] == connectionAddress)
+            return i;
+    }
+
+    ConnectionList.push_back(connectionAddress);
+    return ConnectionList.size();
+}
+
 void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStore* dataStore)
 {
     // gets the time
@@ -271,7 +211,8 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
     fwrite(packetData, packetDataSize,         1, fileDump);  // data
 
 #if _DEBUG
-    printf("%s Opcode: %-8u Size: %-8u\n", packetType == CMSG ? "CMSG" : "SMSG", packetOpcode, packetDataSize);
+    printf("%s Connection: %-4u Opcode: %-8u Size: %-8u\n",
+        packetType == CMSG ? "CMSG" : "SMSG", connectionId, packetOpcode, packetDataSize);
 #endif
 
     fflush(fileDump);
@@ -279,8 +220,9 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
 
 DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, CDataStore* dataStore, void* param2)
 {
+    DWORD conIndex = GetConnectionIndex((DWORD)thisPTR);
     // dumps the packet
-    DumpPacket(CMSG, 0, 4, dataStore);
+    DumpPacket(CMSG, conIndex, 4, dataStore);
 
     // unhooks the send function
     HookManager::UnHook(sendAddress, defaultMachineCodeSend);
@@ -303,9 +245,10 @@ DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, CDataStore* dataStor
 
 DWORD __fastcall RecvHook(void* thisPTR, void* /* dummy */, void* param1, CDataStore* dataStore, void* param3)
 {
+    DWORD conIndex = GetConnectionIndex((DWORD)thisPTR);
     WORD opcodeSize = buildNumber <= WOW_MOP_16135 ? 2 : 4;
     // packet dump
-    DumpPacket(SMSG, 0, opcodeSize, dataStore);
+    DumpPacket(SMSG, conIndex, opcodeSize, dataStore);
 
     // unhooks the recv function
     HookManager::UnHook(recvAddress, defaultMachineCodeRecv);
