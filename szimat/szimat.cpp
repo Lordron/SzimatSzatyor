@@ -93,6 +93,7 @@ char dllPath[MAX_PATH] = { 0 };
 FILE* fileDump = 0;
 
 void SendCreatureQuery(int max_entry);
+void SendQuestPOIQuery(int max_entry);
 
 // entry point of the DLL
 BOOL APIENTRY DllMain(HINSTANCE instDLL, DWORD reason, LPVOID /* reserved */)
@@ -337,9 +338,10 @@ DWORD __fastcall RecvHook(void* thisPTR, void* /* dummy */, void* param1, CDataS
 }
 
 
-// fake packet
+// full creature_template query
+// offset
 #define CMSG_CREATURE_QUERY_OFFSET 0x0
-
+// proto
 typedef void(__cdecl *CMSG_CREATURE_QUERY) (void* entry);
 
 void SendCreatureQuery(int max_entry)
@@ -348,6 +350,62 @@ void SendCreatureQuery(int max_entry)
     {
         CMSG_CREATURE_QUERY(baseAddress + CMSG_CREATURE_QUERY_OFFSET)(&entry);
         printf("CMSG_CREATURE_QUERY(0x%08X)(%i)\n", baseAddress + CMSG_CREATURE_QUERY_OFFSET, entry);
+        if (isSigIntOccured)
+            break;
+        Sleep(50);
+    }
+}
+
+
+// full quest_poi_query
+// offsets
+#define CMSG_QUEST_POI_QUERY  0x0
+#define INIT_QUEST_POI_QUERY  0x0
+#define CDATA_STORE_PUT_INT32 0x0
+#define CDATA_STORE_FINALIZE  0x0
+#define CLIENT_SERVICES_SEND2 0x0
+// proto
+typedef CDataStore* (__thiscall *InitializePtr) (CDataStore *pData);
+typedef void(__cdecl *SendQuestPoiQuery)        (CDataStore *pData);
+typedef CDataStore& (__thiscall *PutInt32Ptr)   (CDataStore *pData, DWORD value);
+typedef void(__thiscall *DestroyPtr)            (CDataStore *pData);
+
+/*
+QuestPoi::InitSend(&poiPacket);
+if ( v29 > (unsigned int)v2 )
+{
+    questListPtr = (int)a3;
+    do
+    {
+        QuestPoi::FillQuestList(&thisa, 1, questListPtr);
+        questListPtr += 4;
+        --v29;
+    }
+    while ( v29 );
+}
+QuestPoi::Send((CDataStore *)&poiPacket);
+QuestPoi::ReleasePacket(&poiPacket);  // destroy ???
+*/
+void SendQuestPOIQuery(int max_entry)
+{
+    int count = 20;
+    for (int entry = 1; entry < max_entry;)
+    {
+        CDataStore packet;
+
+        InitializePtr(baseAddress + 0)(&packet);
+
+        PutInt32Ptr(baseAddress + CDATA_STORE_PUT_INT32)(&packet, CMSG_QUEST_POI_QUERY);
+        PutInt32Ptr(baseAddress + CDATA_STORE_PUT_INT32)(&packet, count * 4); // 22 bit
+
+        for (int i = 0; i < count; ++i, ++entry)
+        {
+            PutInt32Ptr(baseAddress + CDATA_STORE_PUT_INT32)(&packet, entry);
+        }
+
+        printf("Send packet CMSG_QUEST_POI_QUERY, entry %i\n", entry);
+        SendQuestPoiQuery(baseAddress + CLIENT_SERVICES_SEND2)(&packet);
+
         if (isSigIntOccured)
             break;
         Sleep(50);
