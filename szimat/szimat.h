@@ -19,7 +19,7 @@
 #include <Shlwapi.h>
 #include <cstdio>
 #include <ctime>
-#include <list>
+#include <vector>
 #include "ConsoleManager.h"
 #include "Shared.h"
 #include "HookManager.h"
@@ -90,4 +90,4 @@ DWORD MainThreadControl(LPVOID /* param */);
 char dllPath[MAX_PATH] = { 0 };
 FILE* fileDump = 0;
 
-std::list<DWORD> ConnectionList = std::list<DWORD>();
+std::vector<DWORD> ConnectionList = std::vector<DWORD>();

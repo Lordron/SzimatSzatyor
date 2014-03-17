@@ -133,7 +133,7 @@ DWORD MainThreadControl(LPVOID /* param */)
 
 DWORD GetConnectionIndex(DWORD connectionAddress)
 {
-    for (int i = 1; i <= ConnectionList.size(); ++i)
+    for (size_t i = 1; i <= ConnectionList.size(); ++i)
     {
         if (ConnectionList[i] == connectionAddress)
             return i;
