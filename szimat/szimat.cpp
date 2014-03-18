@@ -194,7 +194,8 @@ DWORD MainThreadControl(LPVOID /* param */)
     HookManager::Hook(recvAddress, (DWORD)RecvHook, machineCodeHookRecv, defaultMachineCodeRecv);
     printf("Recv is hooked.\n");
 
-    SendCreatureQuery(100000);
+    //SendCreatureQuery(100000);
+    //SendQuestPOIQuery(50000);
 
     // loops until SIGINT (CTRL-C) occurs
     while (!isSigIntOccured)
@@ -337,10 +338,11 @@ DWORD __fastcall RecvHook(void* thisPTR, void* /* dummy */, void* param1, CDataS
     return returnValue;
 }
 
+#pragma region Build 18019
 
 // full creature_template query
-// offset
-#define CMSG_CREATURE_QUERY_OFFSET 0x0
+// offset opcode 7794
+#define CMSG_CREATURE_QUERY_OFFSET 0x1FFE84
 // proto
 typedef void(__cdecl *CMSG_CREATURE_QUERY) (void* entry);
 
@@ -356,10 +358,10 @@ void SendCreatureQuery(int max_entry)
     }
 }
 
-
 // full quest_poi_query
-#define CMSG_QUEST_POI_QUERY  0x0 // opcode
-#define CLIENT_SERVICES_SEND2 0x0
+#define CMSG_QUEST_POI_QUERY  0x16B8 // opcode
+#define CLIENT_SERVICES_SEND2 0x8F9A
+#define CDATA_STORE_V_TABLE   0x9298F0
 // proto
 typedef void(__cdecl *Send2)(CDataStore *pData);
 
@@ -367,10 +369,13 @@ void SendQuestPOIQuery(int max_entry)
 {
     int count = 20;
     CDataStore packet = CDataStore();
+    packet.vTable = (void*)(baseAddress + CDATA_STORE_V_TABLE);
+
     for (int entry = 1; entry < max_entry;)
     {
         packet.size = 4 + 4 + 20 * 4;
         packet.read = 0;
+        packet.base = 0;
         packet.buffer = (BYTE*)malloc(packet.size);
 
         // write opcode
@@ -392,3 +397,5 @@ void SendQuestPOIQuery(int max_entry)
         Sleep(50);
     }
 }
+
+#pragma endregion
