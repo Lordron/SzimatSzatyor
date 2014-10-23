@@ -45,6 +45,10 @@ typedef struct {
     DWORD locale;
 } HookEntry;
 
+#define GetPrivateProfileInt(section, key, entry)\
+        GetPrivateProfileString(section, key, "0", ret, 20, fileName);\
+        entry = strtol(ret, 0, 0)
+
 // returns the build number of the client
 // returns 0 if an error occurred
 // (gets this from file version info of client's exe)
@@ -123,35 +127,39 @@ bool GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry
     char ret[20];
     char fileName[MAX_PATH];
     char dllPath[MAX_PATH];
-    char section[6];
+    char section[10];
 
     GetModuleFileName((HMODULE)moduleHandle, dllPath, MAX_PATH);
     // removes the DLL name from the path
     PathRemoveFileSpec(dllPath);
 
     _snprintf(fileName, MAX_PATH, "%s\\offsets.ini", dllPath);
+
+#if _WIN64
+    _snprintf(section, 6, "%i_x64", build);
+#else
     _snprintf(section, 6, "%i", build);
+#endif
 
     if (_access(fileName, 0) == -1)
     {
         printf("ERROR: File \"%s\" does not exist.\n", fileName);
         printf("\noffsets.ini template:\n");
+
+#if _WIN64
+        printf("[build_x64]\n");
+#else
         printf("[build]\n");
+#endif
         printf("send_2=0xDEADBEEF\n");
         printf("recive=0xDEADBEEF\n");
         printf("locale=0xDEADBEEF\n\n");
         return false;
     }
 
-    GetPrivateProfileString(section, "send_2", "0", ret, 20, fileName);
-    entry->send_2 = strtol(ret, 0, 0);
-
-    GetPrivateProfileString(section, "recive", "0", ret, 20, fileName);
-    entry->recive = strtol(ret, 0, 0);
-
-    // optional
-    GetPrivateProfileString(section, "locale", "0", ret, 20, fileName);
-    entry->locale = strtol(ret, 0, 0);
+    GetPrivateProfileInt(section, "send_2", entry->send_2);
+    GetPrivateProfileInt(section, "recive", entry->recive);
+    GetPrivateProfileInt(section, "locale", entry->locale); // optional
 
     return entry->recive != 0 && entry->send_2 != 0;
 }

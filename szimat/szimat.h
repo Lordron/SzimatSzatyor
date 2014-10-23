@@ -47,13 +47,13 @@ HookEntry hookEntry;
 
 // this function will be called when send called in the client
 // client has thiscall calling convention
-// that means: this pointer is passed via the ECX register
+// that means: this pointer is passed via the ECX/RCX register
 // fastcall convention means that the first 2 parameters is passed
-// via ECX and EDX registers so the first param will be the this pointer and
+// via ECX/RCX and EDX/RDX registers so the first param will be the this pointer and
 // the second one is just a dummy (not used)
-DWORD __fastcall SendHook(void* thisPTR, void*, CDataStore*, void*);
+DWORD __fastcall SendHook(void* thisPTR, void*, CDataStore*, DWORD);
 
-typedef DWORD(__thiscall *SendProto)(void*, void*, void*);
+typedef DWORD(__thiscall *SendProto)(void*, void*, DWORD);
 
 // address of WoW's send function
 DWORD sendAddress = 0;
@@ -61,7 +61,8 @@ DWORD sendAddress = 0;
 // hooks client's send function
 BYTE machineCodeHookSend[JMP_INSTRUCTION_SIZE] = { 0 };
 // global storage which stores the
-// untouched first 5 bytes machine code from the client's send function
+// untouched first 5 bytes for x86 or 12 bytes for x64 machine code
+// from the client's send function
 BYTE defaultMachineCodeSend[JMP_INSTRUCTION_SIZE] = { 0 };
 
 // this function will be called when recv called in the client
@@ -79,7 +80,8 @@ DWORD recvAddress = 0;
 // hooks client's recv function
 BYTE machineCodeHookRecv[JMP_INSTRUCTION_SIZE] = { 0 };
 // global storage which stores the
-// untouched first 5 bytes machine code from the client's recv function
+// untouched first 5 bytes for x86 or 12 bytes for x64 machine code
+// from the client's recv function
 BYTE defaultMachineCodeRecv[JMP_INSTRUCTION_SIZE] = { 0 };
 
 // these are false if "hook functions" don't called yet
@@ -92,4 +94,4 @@ bool recvHookGood = false;
 DWORD MainThreadControl(LPVOID /* param */);
 
 char dllPath[MAX_PATH] = { 0 };
-FILE* fileDump = 0;
+FILE* fileDump = NULL;

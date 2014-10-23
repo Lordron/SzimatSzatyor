@@ -15,6 +15,7 @@
 
 [D|d]ebug/*
 [R|r]elease/*
+x64/*
 ipch/*
 
 *.exe

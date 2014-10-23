@@ -29,9 +29,6 @@ public:
         if (!AllocConsole())
             return false;
 
-        // registers a handler which handles SIGINT (CTRL-C) signal
-        // basically the handler routine will be called when
-        // CTRL-C (exit) will be pressed
         if (!SetConsoleCtrlHandler((PHANDLER_ROUTINE)ConsoleManager::SignalHandler_SIGINT, TRUE))
             return false;
 
@@ -41,8 +38,11 @@ public:
             return false;
 
         // nice title again :)
+#if _WIN64
+        SetConsoleTitle("SzimatSzatyor x64, WoW injector sniffer");
+#else
         SetConsoleTitle("SzimatSzatyor, WoW injector sniffer");
-
+#endif
         // re-opens STDOUT handle as a console window output
         freopen("CONOUT$", "w", stdout);
 
@@ -56,11 +56,8 @@ public:
     // destroys the console
     static void Destroy() { FreeConsole(); }
 
-    // this method will be called when a CTRL-C event occures
-    // should stop the sniffing loop, so the sniffer will be stopped
     static BOOL SignalHandler_SIGINT(DWORD type)
     {
-        // SIGINT
         printf("\nQuiting...\n");
         // stops the sniffing loop
         *_sniffingLoopCondition = true;
