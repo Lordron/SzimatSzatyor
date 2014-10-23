@@ -23,7 +23,11 @@
 #include "..\szimat\Shared.h"
 
 // default name of the process which will be hooked
+#if _WIN64
+const char* lookingProcessName = "Wow-64.exe";
+#else
 const char* lookingProcessName = "Wow.exe";
+#endif
 // this DLL will be injected
 const char injectDLLName[] = "szimat.dll";
 
@@ -49,7 +53,11 @@ bool InjectDLL(DWORD /* processID */, const char* /* dllLocation */);
 int main(int argc, char* argv[])
 {
     // nice title :)
+#if _WIN64
+    SetConsoleTitle("SzimatSzatyor x64, WoW injector sniffer");
+#else
     SetConsoleTitle("SzimatSzatyor, WoW injector sniffer");
+#endif
 
     // some info
     printf("Welcome to SzimatSzatyor, a WoW injector sniffer.\n");
@@ -378,8 +386,8 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     HMODULE hModule = GetModuleHandle(loadedModuleName);
     if (!hModule)
     {
-        printf("ERROR: Can't get %s's handle, ");
-        printf("ErrorCode: %u\n", loadedModuleName, GetLastError());
+        printf("ERROR: Can't get %s's handle, ", loadedModuleName);
+        printf("ErrorCode: %u\n", GetLastError());
         return false;
     }
 
@@ -387,8 +395,8 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     FARPROC loadLibraryAddress = GetProcAddress(hModule, loadDLLFunctionName);
     if (!loadLibraryAddress)
     {
-        printf("ERROR: Can't get function %s's address, ");
-        printf("ErrorCode: %u\n", loadDLLFunctionName, GetLastError());
+        printf("ERROR: Can't get function %s's address, ", loadDLLFunctionName);
+        printf("ErrorCode: %u\n", GetLastError());
         return false;
     }
 

@@ -95,3 +95,6 @@ DWORD MainThreadControl(LPVOID /* param */);
 
 char dllPath[MAX_PATH] = { 0 };
 FILE* fileDump = NULL;
+
+DWORD CMSG_packetCount = 0;
+DWORD SMSG_packetCount = 0;

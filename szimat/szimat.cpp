@@ -143,7 +143,7 @@ DWORD MainThreadControl(LPVOID /* param */)
     return 0;
 }
 
-void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStore* dataStore)
+void DumpPacket(DWORD64 packetType, DWORD connectionId, WORD opcodeSize, CDataStore* dataStore)
 {
     mtx.lock();
     // gets the time
@@ -212,7 +212,9 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
     fwrite(packetData, packetDataSize,         1, fileDump);  // data
 
 #if _DEBUG
-    printf("%s Opcode: %-8u Size: %-8u\n", packetType == CMSG ? "CMSG" : "SMSG", packetOpcode, packetDataSize);
+    printf("%s Opcode: %-8u Size: %-8u\n", &packetType, packetOpcode, packetDataSize);
+#else
+    printf("Packet count CMSG: %u SMSG: %u\r", CMSG_packetCount, SMSG_packetCount);
 #endif
 
     fflush(fileDump);
@@ -222,6 +224,7 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
 
 DWORD __fastcall SendHook(void* thisPTR, void* dummy , CDataStore* dataStore, DWORD connectionId)
 {
+    ++CMSG_packetCount;
     // dumps the packet
     DumpPacket(CMSG, (DWORD)connectionId, 4, dataStore);
 
@@ -248,6 +251,7 @@ DWORD __fastcall SendHook(void* thisPTR, void* dummy , CDataStore* dataStore, DW
 
 DWORD __fastcall RecvHook3(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore)
 {
+    ++SMSG_packetCount;
     // packet dump
     DumpPacket(SMSG, 0, 2, dataStore);
 
@@ -271,6 +275,7 @@ DWORD __fastcall RecvHook3(void* thisPTR, void* dummy, void* param1, CDataStore*
 
 DWORD __fastcall RecvHook4(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3)
 {
+    ++SMSG_packetCount;
     WORD opcodeSize = buildNumber <= WOW_MOP_16135 ? 2 : 4;
     // packet dump
     DumpPacket(SMSG, (DWORD)param3, opcodeSize, dataStore);
@@ -295,6 +300,7 @@ DWORD __fastcall RecvHook4(void* thisPTR, void* dummy, void* param1, CDataStore*
 
 DWORD __fastcall RecvHook5(void* thisPTR, void* dummy, void* param1, void* param2, CDataStore* dataStore, void* param4)
 {
+    ++SMSG_packetCount;
     // packet dump
     DumpPacket(SMSG, (DWORD)param4, 4, dataStore);
 

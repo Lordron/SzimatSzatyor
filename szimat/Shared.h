@@ -45,10 +45,6 @@ typedef struct {
     DWORD locale;
 } HookEntry;
 
-#define GetPrivateProfileInt(section, key, entry)\
-        GetPrivateProfileString(section, key, "0", ret, 20, fileName);\
-        entry = strtol(ret, 0, 0)
-
 // returns the build number of the client
 // returns 0 if an error occurred
 // (gets this from file version info of client's exe)
@@ -76,6 +72,7 @@ WORD GetBuildNumberFromProcess(HANDLE hProcess = NULL)
     // param process should NOT be NULL in the injector
     else
         processExePathSize = GetModuleFileNameEx(hProcess, NULL, processExePath, MAX_PATH);
+
     if (!processExePathSize)
     {
         printf("ERROR: Can't get path of the process' exe, ErrorCode: %u\n", GetLastError());
@@ -124,7 +121,6 @@ WORD GetBuildNumberFromProcess(HANDLE hProcess = NULL)
 // return the HookEntry from current build
 bool GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry)
 {
-    char ret[20];
     char fileName[MAX_PATH];
     char dllPath[MAX_PATH];
     char section[10];
@@ -136,9 +132,9 @@ bool GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry
     _snprintf(fileName, MAX_PATH, "%s\\offsets.ini", dllPath);
 
 #if _WIN64
-    _snprintf(section, 6, "%i_x64", build);
+    _snprintf(section, 10, "%i_x64", build);
 #else
-    _snprintf(section, 6, "%i", build);
+    _snprintf(section, 10, "%i_x86", build);
 #endif
 
     if (_access(fileName, 0) == -1)
@@ -149,7 +145,7 @@ bool GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry
 #if _WIN64
         printf("[build_x64]\n");
 #else
-        printf("[build]\n");
+        printf("[build_x86]\n");
 #endif
         printf("send_2=0xDEADBEEF\n");
         printf("recive=0xDEADBEEF\n");
@@ -157,9 +153,9 @@ bool GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry
         return false;
     }
 
-    GetPrivateProfileInt(section, "send_2", entry->send_2);
-    GetPrivateProfileInt(section, "recive", entry->recive);
-    GetPrivateProfileInt(section, "locale", entry->locale); // optional
+    entry->send_2 = GetPrivateProfileInt(section, "send_2", 0, fileName);
+    entry->recive = GetPrivateProfileInt(section, "recive", 0, fileName);
+    entry->locale = GetPrivateProfileInt(section, "locale", 0, fileName); // optional
 
     return entry->recive != 0 && entry->send_2 != 0;
 }
