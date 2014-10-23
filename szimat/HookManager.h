@@ -17,17 +17,20 @@
 
 #pragma once
 
-// size of the "JMP <displacement>" instruction
-// JMP is 1 byte and displacement is 4 bytes
-#define JMP_INSTRUCTION_SIZE 5
-
-// stores the x86 machine code (JMP assembly opcode) which
-// makes the hooking happen
-// basically this code means that when the CPU reaches this code
-// it will jump relatively forward (or backward if minus) in the code
-// by the value of the displacement and on that address there is our function
-// JMP <displacement>
-BYTE jumpMachineCode[JMP_INSTRUCTION_SIZE] = { 0xE9, 0x00, 0x00, 0x00, 0x00 };
+#if _WIN64
+    #define JMP_INSTRUCTION_SIZE 12
+    // mov rax ... size
+    #define JMP_OPCODE_SIZE 2
+    // mov rax, [displacement]
+    // jmp rax
+    BYTE jumpMachineCode[JMP_INSTRUCTION_SIZE] = { 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xE0 };
+#else
+    #define JMP_INSTRUCTION_SIZE 5
+    // jmp ... size
+    #define JMP_OPCODE_SIZE 1
+    // jmp [displacement]
+    BYTE jumpMachineCode[JMP_INSTRUCTION_SIZE] = { 0xE9, 0x00, 0x00, 0x00, 0x00 };
+#endif
 
 // functions which can hook/unhook functions
 class HookManager
@@ -38,17 +41,17 @@ public:
     // the WoW contains this function
     // hookFunctionAddress - this is the user defined "callback" function
     // which will be called on hook
-    static void Hook(DWORD hookedFunctionAddress, DWORD hookFunctionAddress, BYTE* hookMachineCode, BYTE* defaultMachineCode)
+    static void Hook(DWORD_PTR hookedFunctionAddress, DWORD_PTR hookFunctionAddress, BYTE* hookMachineCode, BYTE* defaultMachineCode)
     {
-        // be nice and nulls the displacement
-        memset(&jumpMachineCode[1], 0x00, 4);
+        // calculates the displacement
+        DWORD_PTR jmpDisplacement = hookFunctionAddress - hookedFunctionAddress - JMP_INSTRUCTION_SIZE;
 
+        // be nice and nulls the displacement
+        memset(&jumpMachineCode[JMP_OPCODE_SIZE], 0x00, sizeof(void*));
         // copies the "default" (no displacement yet) instruction
         memcpy(hookMachineCode, jumpMachineCode, JMP_INSTRUCTION_SIZE);
-        // calculates the displacement
-        DWORD jmpDisplacement = hookFunctionAddress - hookedFunctionAddress - JMP_INSTRUCTION_SIZE;
         // copies the calculated value of the displacement
-        memcpy(&hookMachineCode[1], &jmpDisplacement, 4);
+        memcpy(&hookMachineCode[JMP_OPCODE_SIZE], &jmpDisplacement, sizeof(void*));
 
         // stores the previous access protection
         DWORD oldProtect;
@@ -76,7 +79,7 @@ public:
     }
 
     // restores the original machine code
-    static void UnHook(DWORD hookedFunctionAddress, BYTE* defaultMachineCode)
+    static void UnHook(DWORD_PTR hookedFunctionAddress, BYTE* defaultMachineCode)
     {
         // stores the old protection
         DWORD oldProtect;
@@ -95,7 +98,7 @@ public:
     }
 
     // restores the hook
-    static void ReHook(DWORD hookedFunctionAddress, BYTE* hookMachineCode)
+    static void ReHook(DWORD_PTR hookedFunctionAddress, BYTE* hookMachineCode)
     {
         // stores the previous access protection
         DWORD oldProtect;

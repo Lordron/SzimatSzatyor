@@ -22,7 +22,6 @@
 #include <cstdio>
 #include <io.h>
 
-#define WOW_TBC_8606  8606
 #define WOW_MOP_16135 16135
 
 typedef struct {
@@ -44,6 +43,8 @@ typedef struct {
     DWORD recive;
     // offset of client locale "xxXX"
     DWORD locale;
+    // offset of creature query function
+    DWORD npc_qw;
 } HookEntry;
 
 // returns the build number of the client
@@ -73,6 +74,7 @@ WORD GetBuildNumberFromProcess(HANDLE hProcess = NULL)
     // param process should NOT be NULL in the injector
     else
         processExePathSize = GetModuleFileNameEx(hProcess, NULL, processExePath, MAX_PATH);
+
     if (!processExePathSize)
     {
         printf("ERROR: Can't get path of the process' exe, ErrorCode: %u\n", GetLastError());
@@ -121,38 +123,43 @@ WORD GetBuildNumberFromProcess(HANDLE hProcess = NULL)
 // return the HookEntry from current build
 bool GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry)
 {
-    char ret[20];
     char fileName[MAX_PATH];
     char dllPath[MAX_PATH];
-    char section[6];
+    char section[10];
 
     GetModuleFileName((HMODULE)moduleHandle, dllPath, MAX_PATH);
     // removes the DLL name from the path
     PathRemoveFileSpec(dllPath);
 
     _snprintf(fileName, MAX_PATH, "%s\\offsets.ini", dllPath);
-    _snprintf(section, 6, "%i", build);
+
+#if _WIN64
+    _snprintf(section, 10, "%i_x64", build);
+#else
+    _snprintf(section, 10, "%i_x86", build);
+#endif
 
     if (_access(fileName, 0) == -1)
     {
         printf("ERROR: File \"%s\" does not exist.\n", fileName);
         printf("\noffsets.ini template:\n");
-        printf("[build]\n");
+
+#if _WIN64
+        printf("[build_x64]\n");
+#else
+        printf("[build_x86]\n");
+#endif
         printf("send_2=0xDEADBEEF\n");
         printf("recive=0xDEADBEEF\n");
         printf("locale=0xDEADBEEF\n\n");
+        printf("npc_qw=0xDEADBEEF\n\n");
         return false;
     }
 
-    GetPrivateProfileString(section, "send_2", "0", ret, 20, fileName);
-    entry->send_2 = strtol(ret, 0, 0);
-
-    GetPrivateProfileString(section, "recive", "0", ret, 20, fileName);
-    entry->recive = strtol(ret, 0, 0);
-
-    // optional
-    GetPrivateProfileString(section, "locale", "0", ret, 20, fileName);
-    entry->locale = strtol(ret, 0, 0);
+    entry->send_2 = GetPrivateProfileInt(section, "send_2", 0, fileName);
+    entry->recive = GetPrivateProfileInt(section, "recive", 0, fileName);
+    entry->locale = GetPrivateProfileInt(section, "locale", 0, fileName); // optional
+    entry->npc_qw = GetPrivateProfileInt(section, "npc_qw", 0, fileName); // optional
 
     return entry->recive != 0 && entry->send_2 != 0;
 }

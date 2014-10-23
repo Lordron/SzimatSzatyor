@@ -29,17 +29,6 @@ public:
         if (!AllocConsole())
             return false;
 
-        // gets the window handle used by the console 
-        HWND consoleWindowHandler = GetConsoleWindow();
-        // disables the "close button" on the console
-        // console shutdown should work via SIGINT
-        EnableMenuItem(GetSystemMenu(consoleWindowHandler, FALSE), SC_CLOSE, MF_GRAYED);
-        // just be sure to display the grayed (and disabled) close button
-        DrawMenuBar(consoleWindowHandler); // re-draw
-
-        // registers a handler which handles SIGINT (CTRL-C) signal
-        // basically the handler routine will be called when
-        // CTRL-C (exit) will be pressed
         if (!SetConsoleCtrlHandler((PHANDLER_ROUTINE)ConsoleManager::SignalHandler_SIGINT, TRUE))
             return false;
 
@@ -49,8 +38,11 @@ public:
             return false;
 
         // nice title again :)
+#if _WIN64
+        SetConsoleTitle("SzimatSzatyor x64, WoW injector sniffer");
+#else
         SetConsoleTitle("SzimatSzatyor, WoW injector sniffer");
-
+#endif
         // re-opens STDOUT handle as a console window output
         freopen("CONOUT$", "w", stdout);
 
@@ -64,20 +56,12 @@ public:
     // destroys the console
     static void Destroy() { FreeConsole(); }
 
-    // this method will be called when a CTRL-C event occures
-    // should stop the sniffing loop, so the sniffer will be stopped
     static BOOL SignalHandler_SIGINT(DWORD type)
     {
-        // SIGINT
-        if (type == CTRL_C_EVENT)
-        {
-            printf("\nQuiting...\n");
-            // stops the sniffing loop
-            *_sniffingLoopCondition = true;
-            return TRUE;
-        }
-        // other events not handled
-        return FALSE;
+        printf("\nQuiting...\n");
+        // stops the sniffing loop
+        *_sniffingLoopCondition = true;
+        return TRUE;
     }
 
 private:

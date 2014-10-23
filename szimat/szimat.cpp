@@ -14,86 +14,7 @@
 * You should have received a copy of the GNU General Public License
 * along with SzimatSzatyor.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-#include <Windows.h>
-#include <Shlwapi.h>
-#include <cstdio>
-#include <ctime>
-#include "ConsoleManager.h"
-#include "Shared.h"
-#include "HookManager.h"
-
-#define PKT_VERSION 0x0301
-#define SNIFFER_ID  15
-
-#define CMSG 0x47534D43 // client to server, CMSG
-#define SMSG 0x47534D53 // server to client, SMSG
-
-// static member initilization
-volatile bool* ConsoleManager::_sniffingLoopCondition = NULL;
-
-// needed to correctly shutdown the sniffer
-HINSTANCE instanceDLL = NULL;
-// true when a SIGINT occured
-volatile bool isSigIntOccured = false;
-
-DWORD baseAddress = 0;
-
-// global access to the build number
-WORD buildNumber = 0;
-char locale[5] = { 'x', 'x', 'X', 'X', '\0' };
-HookEntry hookEntry;
-
-// this function will be called when send called in the client
-// client has thiscall calling convention
-// that means: this pointer is passed via the ECX register
-// fastcall convention means that the first 2 parameters is passed
-// via ECX and EDX registers so the first param will be the this pointer and
-// the second one is just a dummy (not used)
-DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, CDataStore* /* dataStore */, void* /* param2 */);
-// this send prototype fits with the client's one
-typedef DWORD(__thiscall *SendProto)(void*, void*, void*);
-
-// address of WoW's send function
-DWORD sendAddress = 0;
-
-// global storage for the "the hooking" machine code which 
-// hooks client's send function
-BYTE machineCodeHookSend[JMP_INSTRUCTION_SIZE] = { 0 };
-// global storage which stores the
-// untouched first 5 bytes machine code from the client's send function
-BYTE defaultMachineCodeSend[JMP_INSTRUCTION_SIZE] = { 0 };
-
-// this function will be called when recv called in the client
-DWORD __fastcall RecvHook(void* thisPTR, void* /* dummy */, void* /* param1 */, CDataStore* /* dataStore */, void* /* param3 */);
-// this recv prototype fits with the client's one
-typedef DWORD(__thiscall *RecvProto)(void*, void*, void*, void*);
-// clients which has build number <= 8606 have different prototype
-typedef DWORD(__thiscall *RecvProto8606)(void*, void*, void*);
-
-// address of WoW's recv function
-DWORD recvAddress = 0;
-// global storage for the "the hooking" machine code which
-// hooks client's recv function
-BYTE machineCodeHookRecv[JMP_INSTRUCTION_SIZE] = { 0 };
-// global storage which stores the
-// untouched first 5 bytes machine code from the client's recv function
-BYTE defaultMachineCodeRecv[JMP_INSTRUCTION_SIZE] = { 0 };
-
-// these are false if "hook functions" don't called yet
-// and they are true if already called at least once
-bool sendHookGood = false;
-bool recvHookGood = false;
-
-// basically this method controls what the sniffer should do
-// pretty much like a "main method"
-DWORD MainThreadControl(LPVOID /* param */);
-
-char dllPath[MAX_PATH] = { 0 };
-FILE* fileDump = 0;
-
-void SendCreatureQuery(int max_entry);
-void SendQuestPOIQuery(int max_entry);
+#include "szimat.h"
 
 // entry point of the DLL
 BOOL APIENTRY DllMain(HINSTANCE instDLL, DWORD reason, LPVOID /* reserved */)
@@ -160,7 +81,7 @@ DWORD MainThreadControl(LPVOID /* param */)
     }
 
     // get the base address of the current process
-    baseAddress = (DWORD)GetModuleHandle(NULL);
+    DWORD baseAddress = (DWORD)GetModuleHandle(NULL);
 
     DWORD localeAddress = hookEntry.locale;
     // locale stored in reversed string (enGB as BGne...)
@@ -185,17 +106,32 @@ DWORD MainThreadControl(LPVOID /* param */)
     // gets address of NetClient::Send2
     sendAddress = baseAddress + hookEntry.send_2;
     // hooks client's send function
-    HookManager::Hook(sendAddress, (DWORD)SendHook, machineCodeHookSend, defaultMachineCodeSend);
+    HookManager::Hook(sendAddress, (DWORD_PTR)SendHook, machineCodeHookSend, defaultMachineCodeSend);
     printf("Send is hooked.\n");
 
     // gets address of NetClient::ProcessMessage
     recvAddress = baseAddress + hookEntry.recive;
     // hooks client's recv function
-    HookManager::Hook(recvAddress, (DWORD)RecvHook, machineCodeHookRecv, defaultMachineCodeRecv);
+
+    if (buildNumber < 8606)
+    {
+        HookManager::Hook(recvAddress, (DWORD_PTR)RecvHook3, machineCodeHookRecv, defaultMachineCodeRecv);
+    }
+    else if (buildNumber < 19000)
+    {
+        HookManager::Hook(recvAddress, (DWORD_PTR)RecvHook4, machineCodeHookRecv, defaultMachineCodeRecv);
+    }
+    else
+    {
+        HookManager::Hook(recvAddress, (DWORD_PTR)RecvHook5, machineCodeHookRecv, defaultMachineCodeRecv);
+    }
+
     printf("Recv is hooked.\n");
 
-    //SendCreatureQuery(100000);
-    //SendQuestPOIQuery(50000);
+    if (hookEntry.npc_qw > 0)
+    {
+        GetAllCreatures(hookEntry.npc_qw + baseAddress, 100000);
+    }
 
     // loops until SIGINT (CTRL-C) occurs
     while (!isSigIntOccured)
@@ -212,8 +148,9 @@ DWORD MainThreadControl(LPVOID /* param */)
     return 0;
 }
 
-void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStore* dataStore)
+void DumpPacket(DWORD64 packetType, DWORD connectionId, WORD opcodeSize, CDataStore* dataStore)
 {
+    mtx.lock();
     // gets the time
     time_t rawTime;
     time(&rawTime);
@@ -248,7 +185,7 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
         DWORD tickCount     = GetTickCount();
         BYTE sessionKey[40] = { 0 };
 
-        fileDump = fopen(fullFileName, "ab");
+        fileDump = fopen(fullFileName, "wb");
         // PKT 3.1 header
         fwrite("PKT",                           3, 1, fileDump);  // magic
         fwrite((WORD*)&pkt_version,             2, 1, fileDump);  // major.minor version
@@ -280,23 +217,28 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
     fwrite(packetData, packetDataSize,         1, fileDump);  // data
 
 #if _DEBUG
-    printf("%s Opcode: %-8u Size: %-8u\n", packetType == CMSG ? "CMSG" : "SMSG", packetOpcode, packetDataSize);
+    printf("%s Opcode: %-8u Size: %-8u\n", &packetType, packetOpcode, packetDataSize);
+#else
+    printf("Packet count CMSG: %u SMSG: %u\r", CMSG_packetCount, SMSG_packetCount);
 #endif
 
     fflush(fileDump);
+
+    mtx.unlock();
 }
 
-DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, CDataStore* dataStore, void* param2)
+DWORD __fastcall SendHook(void* thisPTR, void* dummy , CDataStore* dataStore, DWORD connectionId)
 {
+    ++CMSG_packetCount;
     // dumps the packet
-    DumpPacket(CMSG, 0, 4, dataStore);
+    DumpPacket(CMSG, (DWORD)connectionId, 4, dataStore);
 
     // unhooks the send function
     HookManager::UnHook(sendAddress, defaultMachineCodeSend);
 
     // now let's call client's function
     // so it can send the packet to the server (connection, CDataStore*, 2)
-    DWORD returnValue = SendProto(sendAddress)(thisPTR, dataStore, param2);
+    DWORD returnValue = SendProto(sendAddress)(thisPTR, dataStore, connectionId);
 
     // hooks again to catch the next outgoing packets also
     HookManager::ReHook(sendAddress, machineCodeHookSend);
@@ -310,92 +252,94 @@ DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, CDataStore* dataStor
     return 0;
 }
 
-DWORD __fastcall RecvHook(void* thisPTR, void* /* dummy */, void* param1, CDataStore* dataStore, void* param3)
+#pragma region RecvHook
+
+DWORD __fastcall RecvHook3(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore)
 {
-    WORD opcodeSize = buildNumber <= WOW_MOP_16135 ? 2 : 4;
+    ++SMSG_packetCount;
     // packet dump
-    DumpPacket(SMSG, 0, opcodeSize, dataStore);
+    DumpPacket(SMSG, 0, 2, dataStore);
 
     // unhooks the recv function
     HookManager::UnHook(recvAddress, defaultMachineCodeRecv);
 
     // calls client's function so it can processes the packet
-    DWORD returnValue = 0;
-    if (buildNumber <= WOW_TBC_8606) // different prototype
-        returnValue = RecvProto8606(recvAddress)(thisPTR, param1, dataStore);
-    else
-        returnValue = RecvProto(recvAddress)(thisPTR, param1, dataStore, param3);
+    DWORD returnValue = RecvProto3(recvAddress)(thisPTR, param1, dataStore);
 
     // hooks again to catch the next incoming packets also
     HookManager::ReHook(recvAddress, machineCodeHookRecv);
 
     if (!recvHookGood)
     {
-        printf("Recv hook is working.\n");
+        printf("Recv hook3 is working.\n");
         recvHookGood = true;
     }
 
     return returnValue;
 }
 
-#pragma region Build 18019
-
-// full creature_template query
-// offset opcode 7794
-#define CMSG_CREATURE_QUERY_OFFSET 0x1FFE84
-// proto
-typedef void(__cdecl *CMSG_CREATURE_QUERY) (void* entry);
-
-void SendCreatureQuery(int max_entry)
+DWORD __fastcall RecvHook4(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3)
 {
-    for (int entry = 1; entry < max_entry; ++entry)
+    ++SMSG_packetCount;
+    WORD opcodeSize = buildNumber <= WOW_MOP_16135 ? 2 : 4;
+    // packet dump
+    DumpPacket(SMSG, (DWORD)param3, opcodeSize, dataStore);
+
+    // unhooks the recv function
+    HookManager::UnHook(recvAddress, defaultMachineCodeRecv);
+
+    // calls client's function so it can processes the packet
+    DWORD returnValue = RecvProto4(recvAddress)(thisPTR, param1, dataStore, param3);
+
+    // hooks again to catch the next incoming packets also
+    HookManager::ReHook(recvAddress, machineCodeHookRecv);
+
+    if (!recvHookGood)
     {
-        CMSG_CREATURE_QUERY(baseAddress + CMSG_CREATURE_QUERY_OFFSET)(&entry);
-        printf("CMSG_CREATURE_QUERY(0x%08X)(%i)\n", baseAddress + CMSG_CREATURE_QUERY_OFFSET, entry);
-        if (isSigIntOccured)
-            break;
-        Sleep(50);
+        printf("Recv hook4 is working.\n");
+        recvHookGood = true;
     }
+
+    return returnValue;
 }
 
-// full quest_poi_query
-#define CMSG_QUEST_POI_QUERY  0x16B8 // opcode
-#define CLIENT_SERVICES_SEND2 0x8F9A
-#define CDATA_STORE_V_TABLE   0x9298F0
-// proto
-typedef void(__cdecl *Send2)(CDataStore *pData);
-
-void SendQuestPOIQuery(int max_entry)
+DWORD __fastcall RecvHook5(void* thisPTR, void* dummy, void* param1, void* param2, CDataStore* dataStore, void* param4)
 {
-    int count = 20;
-    CDataStore packet = CDataStore();
-    packet.vTable = (void*)(baseAddress + CDATA_STORE_V_TABLE);
+    ++SMSG_packetCount;
+    // packet dump
+    DumpPacket(SMSG, (DWORD)param4, 4, dataStore);
 
-    for (int entry = 1; entry < max_entry;)
+    // unhooks the recv function
+    HookManager::UnHook(recvAddress, defaultMachineCodeRecv);
+
+    // calls client's function so it can processes the packet
+    DWORD returnValue = RecvProto5(recvAddress)(thisPTR, param1, param2, dataStore, param4);
+
+    // hooks again to catch the next incoming packets also
+    HookManager::ReHook(recvAddress, machineCodeHookRecv);
+
+    if (!recvHookGood)
     {
-        packet.size = 4 + 4 + 20 * 4;
-        packet.read = 0;
-        packet.base = 0;
-        packet.buffer = (BYTE*)malloc(packet.size);
-
-        // write opcode
-        *(DWORD*)(packet.buffer + 0) = CMSG_QUEST_POI_QUERY;
-        *(DWORD*)(packet.buffer + 4) = count << 2; // 22 bits
-
-        for (int i = 0; i < count; ++i, ++entry)
-        {
-            *(DWORD*)((packet.buffer + 8) + (i * 4)) = entry;
-        }
-
-        printf("Send packet CMSG_QUEST_POI_QUERY, entry %i\n", entry);
-        Send2(baseAddress + CLIENT_SERVICES_SEND2)(&packet);
-
-        free(packet.buffer);
-
-        if (isSigIntOccured)
-            break;
-        Sleep(50);
+        printf("Recv hook5 is working.\n");
+        recvHookGood = true;
     }
+
+    return returnValue;
 }
 
 #pragma endregion
+
+void GetAllCreatures(DWORD_PTR address, DWORD max_entry)
+{
+    printf("Started Creature linking [1 - %u]\n\n", max_entry);
+
+    for (DWORD entry = 1; entry < max_entry; ++entry)
+    {
+        CreatureQueryProto(address+0)(&entry);
+        printf("CMSG_CREATURE_QUERY %i\t", entry);
+
+        if (isSigIntOccured)
+            break;
+        Sleep(50);
+    }
+}
