@@ -83,10 +83,10 @@ DWORD MainThreadControl(LPVOID /* param */)
     // get the base address of the current process
     DWORD baseAddress = (DWORD)GetModuleHandle(NULL);
 
-    DWORD localeAddress = hookEntry.locale;
     // locale stored in reversed string (enGB as BGne...)
-    if (localeAddress)
+    if (hookEntry.locale)
     {
+        DWORD localeAddress = hookEntry.locale;
         for (int i = 3; i >= 0; --i)
             locale[i] = *(char*)(baseAddress + localeAddress++);
         printf("Detected client locale: %s\n", locale);
@@ -106,7 +106,7 @@ DWORD MainThreadControl(LPVOID /* param */)
     // gets address of NetClient::Send2
     sendAddress = baseAddress + hookEntry.send_2;
     // hooks client's send function
-    HookManager::Hook(sendAddress, (DWORD)SendHook, machineCodeHookSend, defaultMachineCodeSend);
+    HookManager::Hook(sendAddress, (DWORD_PTR)SendHook, machineCodeHookSend, defaultMachineCodeSend);
     printf("Send is hooked.\n");
 
     // gets address of NetClient::ProcessMessage
@@ -115,15 +115,15 @@ DWORD MainThreadControl(LPVOID /* param */)
 
     if (buildNumber < 8606)
     {
-        HookManager::Hook(recvAddress, (DWORD)RecvHook3, machineCodeHookRecv, defaultMachineCodeRecv);
+        HookManager::Hook(recvAddress, (DWORD_PTR)RecvHook3, machineCodeHookRecv, defaultMachineCodeRecv);
     }
     else if (buildNumber < 19000)
     {
-        HookManager::Hook(recvAddress, (DWORD)RecvHook4, machineCodeHookRecv, defaultMachineCodeRecv);
+        HookManager::Hook(recvAddress, (DWORD_PTR)RecvHook4, machineCodeHookRecv, defaultMachineCodeRecv);
     }
     else
     {
-        HookManager::Hook(recvAddress, (DWORD)RecvHook5, machineCodeHookRecv, defaultMachineCodeRecv);
+        HookManager::Hook(recvAddress, (DWORD_PTR)RecvHook5, machineCodeHookRecv, defaultMachineCodeRecv);
     }
 
     printf("Recv is hooked.\n");
@@ -226,7 +226,7 @@ DWORD __fastcall SendHook(void* thisPTR, void* dummy , CDataStore* dataStore, DW
 {
     ++CMSG_packetCount;
     // dumps the packet
-    DumpPacket(CMSG, (DWORD)connectionId, 4, dataStore);
+    DumpPacket(CMSG, connectionId, 4, dataStore);
 
     // unhooks the send function
     HookManager::UnHook(sendAddress, defaultMachineCodeSend);

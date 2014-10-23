@@ -41,10 +41,10 @@ public:
     // the WoW contains this function
     // hookFunctionAddress - this is the user defined "callback" function
     // which will be called on hook
-    static void Hook(DWORD hookedFunctionAddress, DWORD hookFunctionAddress, BYTE* hookMachineCode, BYTE* defaultMachineCode)
+    static void Hook(DWORD_PTR hookedFunctionAddress, DWORD_PTR hookFunctionAddress, BYTE* hookMachineCode, BYTE* defaultMachineCode)
     {
         // calculates the displacement
-        DWORD jmpDisplacement = hookFunctionAddress - hookedFunctionAddress - JMP_INSTRUCTION_SIZE;
+        DWORD_PTR jmpDisplacement = hookFunctionAddress - hookedFunctionAddress - JMP_INSTRUCTION_SIZE;
 
         // be nice and nulls the displacement
         memset(&jumpMachineCode[JMP_OPCODE_SIZE], 0x00, sizeof(void*));
@@ -79,7 +79,7 @@ public:
     }
 
     // restores the original machine code
-    static void UnHook(DWORD hookedFunctionAddress, BYTE* defaultMachineCode)
+    static void UnHook(DWORD_PTR hookedFunctionAddress, BYTE* defaultMachineCode)
     {
         // stores the old protection
         DWORD oldProtect;
@@ -98,7 +98,7 @@ public:
     }
 
     // restores the hook
-    static void ReHook(DWORD hookedFunctionAddress, BYTE* hookMachineCode)
+    static void ReHook(DWORD_PTR hookedFunctionAddress, BYTE* hookMachineCode)
     {
         // stores the previous access protection
         DWORD oldProtect;
