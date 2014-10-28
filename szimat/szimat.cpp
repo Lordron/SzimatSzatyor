@@ -75,7 +75,7 @@ DWORD MainThreadControl(LPVOID /* param */)
     // checks this build is supported or not
     if (!GetOffsets(instanceDLL, buildNumber, &hookEntry))
     {
-        printf("ERROR: This build number is not supported.\n\n");
+        printf("ERROR: This build number %i is not supported.\n\n", buildNumber);
         system("pause");
         FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
     }
