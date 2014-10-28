@@ -19,7 +19,6 @@
 #include <Shlwapi.h>
 #include <cstdio>
 #include <ctime>
-#include "ConsoleManager.h"
 #include "Shared.h"
 #include "HookManager.h"
 #include <mutex>
@@ -29,9 +28,6 @@
 
 #define CMSG 0x47534D43 // client to server, CMSG
 #define SMSG 0x47534D53 // server to client, SMSG
-
-// static member initilization
-volatile bool* ConsoleManager::_sniffingLoopCondition = NULL;
 
 std::mutex mtx;
 
@@ -44,6 +40,9 @@ volatile bool isSigIntOccured = false;
 WORD buildNumber = 0;
 char locale[5] = { 'x', 'x', 'X', 'X', '\0' };
 HookEntry hookEntry;
+
+BOOL InitConsole();
+BOOL StopSignalHandler(DWORD type);
 
 // this function will be called when send called in the client
 // client has thiscall calling convention

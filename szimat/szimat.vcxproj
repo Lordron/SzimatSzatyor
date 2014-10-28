@@ -168,7 +168,6 @@ copy $(SolutionDir)README $(OutDir)</Command>
     <ClCompile Include="szimat.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ConsoleManager.h" />
     <ClInclude Include="HookManager.h" />
     <ClInclude Include="Shared.h" />
     <ClInclude Include="szimat.h" />

@@ -39,7 +39,7 @@ BOOL APIENTRY DllMain(HINSTANCE instDLL, DWORD reason, LPVOID /* reserved */)
             fclose(fileDump);
 
         // deallocates the console
-        ConsoleManager::Destroy();
+        FreeConsole();
     }
     return TRUE;
 }
@@ -47,7 +47,7 @@ BOOL APIENTRY DllMain(HINSTANCE instDLL, DWORD reason, LPVOID /* reserved */)
 DWORD MainThreadControl(LPVOID /* param */)
 {
     // creates the console
-    if (!ConsoleManager::Create(&isSigIntOccured))
+    if (!InitConsole())
         FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
 
     // some info
@@ -132,16 +132,59 @@ DWORD MainThreadControl(LPVOID /* param */)
     while (!isSigIntOccured)
         Sleep(50); // sleeps 50 ms to be nice
 
-    // unhooks functions
-    HookManager::WriteBlock(sendAddress, defaultMachineCodeSend);
-    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
-
-    // shutdowns the sniffer
-    // note: after that DLL's entry point will be called with
-    // reason DLL_PROCESS_DETACH
-    FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
+    StopSignalHandler(NULL);
     return 0;
 }
+
+#pragma region Console methods
+
+BOOL InitConsole()
+{
+    // basically creates the console
+    if (!AllocConsole())
+        return false;
+
+    if (!SetConsoleCtrlHandler((PHANDLER_ROUTINE)StopSignalHandler, TRUE))
+        return false;
+
+    // just be sure there's a STDOUT
+    HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (!handle || handle == INVALID_HANDLE_VALUE)
+        return false;
+
+    // nice title again :)
+    SetConsoleTitle("SzimatSzatyor, WoW injector sniffer");
+
+    // re-opens STDOUT handle as a console window output
+    freopen("CONOUT$", "w", stdout);
+
+    return true;
+}
+
+BOOL StopSignalHandler(DWORD type)
+{
+    mtx.lock();
+
+    if (!isSigIntOccured)
+    {
+        printf("\nQuiting...\n");
+        // unhooks functions
+        HookManager::WriteBlock(sendAddress, defaultMachineCodeSend);
+        HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
+
+        // shutdowns the sniffer
+        // note: after that DLL's entry point will be called with
+        // reason DLL_PROCESS_DETACH
+        FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
+        isSigIntOccured = true;
+    }
+
+    mtx.unlock();
+
+    return TRUE;
+}
+
+#pragma endregion
 
 void DumpPacket(DWORD64 packetType, DWORD connectionId, WORD opcodeSize, CDataStore* dataStore)
 {
