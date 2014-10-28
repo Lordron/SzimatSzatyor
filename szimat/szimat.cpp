@@ -133,8 +133,8 @@ DWORD MainThreadControl(LPVOID /* param */)
         Sleep(50); // sleeps 50 ms to be nice
 
     // unhooks functions
-    HookManager::UnHook(sendAddress, defaultMachineCodeSend);
-    HookManager::UnHook(recvAddress, defaultMachineCodeRecv);
+    HookManager::WriteBlock(sendAddress, defaultMachineCodeSend);
+    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
 
     // shutdowns the sniffer
     // note: after that DLL's entry point will be called with
@@ -229,14 +229,14 @@ DWORD __fastcall SendHook(void* thisPTR, void* dummy , CDataStore* dataStore, DW
     DumpPacket(CMSG, connectionId, 4, dataStore);
 
     // unhooks the send function
-    HookManager::UnHook(sendAddress, defaultMachineCodeSend);
+    HookManager::WriteBlock(sendAddress, defaultMachineCodeSend);
 
     // now let's call client's function
     // so it can send the packet to the server (connection, CDataStore*, 2)
     DWORD returnValue = SendProto(sendAddress)(thisPTR, dataStore, connectionId);
 
     // hooks again to catch the next outgoing packets also
-    HookManager::ReHook(sendAddress, machineCodeHookSend);
+    HookManager::WriteBlock(sendAddress, machineCodeHookSend);
 
     if (!sendHookGood)
     {
@@ -256,13 +256,13 @@ DWORD __fastcall RecvHook3(void* thisPTR, void* dummy, void* param1, CDataStore*
     DumpPacket(SMSG, 0, 2, dataStore);
 
     // unhooks the recv function
-    HookManager::UnHook(recvAddress, defaultMachineCodeRecv);
+    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
 
     // calls client's function so it can processes the packet
     DWORD returnValue = RecvProto3(recvAddress)(thisPTR, param1, dataStore);
 
     // hooks again to catch the next incoming packets also
-    HookManager::ReHook(recvAddress, machineCodeHookRecv);
+    HookManager::WriteBlock(recvAddress, machineCodeHookRecv);
 
     if (!recvHookGood)
     {
@@ -281,13 +281,13 @@ DWORD __fastcall RecvHook4(void* thisPTR, void* dummy, void* param1, CDataStore*
     DumpPacket(SMSG, (DWORD)param3, opcodeSize, dataStore);
 
     // unhooks the recv function
-    HookManager::UnHook(recvAddress, defaultMachineCodeRecv);
+    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
 
     // calls client's function so it can processes the packet
     DWORD returnValue = RecvProto4(recvAddress)(thisPTR, param1, dataStore, param3);
 
     // hooks again to catch the next incoming packets also
-    HookManager::ReHook(recvAddress, machineCodeHookRecv);
+    HookManager::WriteBlock(recvAddress, machineCodeHookRecv);
 
     if (!recvHookGood)
     {
@@ -305,13 +305,13 @@ DWORD __fastcall RecvHook5(void* thisPTR, void* dummy, void* param1, void* param
     DumpPacket(SMSG, (DWORD)param4, 4, dataStore);
 
     // unhooks the recv function
-    HookManager::UnHook(recvAddress, defaultMachineCodeRecv);
+    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
 
     // calls client's function so it can processes the packet
     DWORD returnValue = RecvProto5(recvAddress)(thisPTR, param1, param2, dataStore, param4);
 
     // hooks again to catch the next incoming packets also
-    HookManager::ReHook(recvAddress, machineCodeHookRecv);
+    HookManager::WriteBlock(recvAddress, machineCodeHookRecv);
 
     if (!recvHookGood)
     {
