@@ -29,7 +29,7 @@ const char* lookingProcessName = "Wow-64.exe";
 const char* lookingProcessName = "Wow.exe";
 #endif
 // this DLL will be injected
-const char injectDLLName[] = "szimat.dll";
+const char* injectDLLName = "szimat.dll";
 
 // this module contains function loadDLLFunctionName
 const char loadedModuleName[] = "kernel32.dll";
@@ -53,11 +53,7 @@ bool InjectDLL(DWORD /* processID */, const char* /* dllLocation */);
 int main(int argc, char* argv[])
 {
     // nice title :)
-#if _WIN64
-    SetConsoleTitle("SzimatSzatyor x64, WoW injector sniffer");
-#else
     SetConsoleTitle("SzimatSzatyor, WoW injector sniffer");
-#endif
 
     // some info
     printf("Welcome to SzimatSzatyor, a WoW injector sniffer.\n");
@@ -65,16 +61,23 @@ int main(int argc, char* argv[])
     printf("Source code is available at: ");
     printf("http://github.com/Anubisss/SzimatSzatyor\n\n");
 
-    if (argc > 2)
+    if (argc > 3)
     {
         printf("ERROR: Invalid parameters. ");
-        printf("\"szatyor.exe [wow_exe_name]\" should be used.\n\n");
+        printf("\"szatyor.exe [wow_exe_name] [attached_dll_name]\" should be used.\n\n");
         system("pause");
         return 0;
     }
     // custom process' name
     else if (argc == 2)
+    {
         lookingProcessName = argv[1];
+    }
+    else if (argc == 3)
+    {
+        lookingProcessName = argv[1];
+        injectDLLName      = argv[2];
+    }
 
     // this process will be injected
     DWORD processID = 0;
@@ -201,7 +204,10 @@ int main(int argc, char* argv[])
     if (InjectDLL(processID, dllPath))
         printf("\nInjection of '%s' is successful.\n\n", injectDLLName);
     else
+    {
         printf("\nInjection of '%s' is NOT successful.\n\n", injectDLLName);
+        system("pause");
+    }
 
     delete[] dllPath;
 
