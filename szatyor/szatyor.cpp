@@ -23,7 +23,12 @@
 #include "..\szimat\Shared.h"
 
 // default name of the process which will be hooked
+#ifdef _M_X64
+const char* lookingProcessName = "Wow-64.exe";
+#else
 const char* lookingProcessName = "Wow.exe";
+#endif
+
 // this DLL will be injected
 const char* injectDLLName = "szimat.dll";
 

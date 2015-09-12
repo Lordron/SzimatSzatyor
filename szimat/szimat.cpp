@@ -103,34 +103,34 @@ DWORD MainThreadControl(LPVOID /* param */)
     }
     printf("\nDLL path: %s\n", dllPath);
 
-    // gets address of NetClient::Send2
-    sendAddress = baseAddress + hookEntry.send;
-    // hooks client's send function
-    HookManager::Hook(sendAddress, (DWORD_PTR)SendHook, machineCodeHookSend, defaultMachineCodeSend);
-    printf("Send is hooked.\n");
-
-    // gets address of NetClient::ProcessMessage
-    recvAddress = baseAddress + hookEntry.recv;
-
-    // hooks client's recv function
-    for each (auto rec in RecvProtoTable)
+    // hooks client's function
+    bool isHookFound = false;
+    for each (ProtoEntry rec in HookTable)
     {
         if (rec.build > buildNumber)
         {
-            HookManager::Hook(recvAddress, rec.proc, machineCodeHookRecv, defaultMachineCodeRecv);
+			printf("Found %s hooks\n", rec.name);
+			sendHook = Injector(baseAddress + hookEntry.send, rec.sendDetour, "Send hook");
+			recvHook = Injector(baseAddress + hookEntry.recv, rec.recvDetour, "Recv hook");
+            isHookFound = true;
             break;
         }
     }
 
-    printf("Recv is hooked.\n");
+    if (!isHookFound)
+    {
+        printf("Hooks not found!\n");
+        FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
+        return 0;
+    }
 
     // loops until SIGINT (CTRL-C) occurs
     while (!isSigIntOccured)
         Sleep(50); // sleeps 50 ms to be nice
 
     // unhooks functions
-    HookManager::WriteBlock(sendAddress, defaultMachineCodeSend);
-    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
+	sendHook.UnHook();
+	recvHook.UnHook();
 
     // shutdowns the sniffer
     // note: after that DLL's entry point will be called with
@@ -210,7 +210,7 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
     fwrite(packetData, packetDataSize,         1, fileDump);  // data
 
 #if _DEBUG
-    printf("%s Opcode: 0x%04X Size: %-8u\n", packetType == CMSG ? "CMSG" : "SMSG", packetOpcode, packetDataSize);
+    //printf("%s Opcode: 0x%04X Size: %-8u\n", packetType == CMSG ? "CMSG" : "SMSG", packetOpcode, packetDataSize);
 #endif
 
     fflush(fileDump);
@@ -224,20 +224,13 @@ DWORD __fastcall SendHook(void* thisPTR, void* dummy , CDataStore* dataStore, DW
     DumpPacket(CMSG, connectionId, 4, dataStore);
 
     // unhooks the send function
-    HookManager::WriteBlock(sendAddress, defaultMachineCodeSend);
+	sendHook.UnHook();
 
     // now let's call client's function
     // so it can send the packet to the server (connection, CDataStore*, 2)
-    DWORD returnValue = SendProto(sendAddress)(thisPTR, dataStore, (void*)connectionId);
+    DWORD returnValue = SendProto(sendHook.GetAddress())(thisPTR, dataStore, (void*)connectionId);
 
-    // hooks again to catch the next outgoing packets also
-    HookManager::WriteBlock(sendAddress, machineCodeHookSend);
-
-    if (!sendHookGood)
-    {
-        printf("Send hook is working.\n");
-        sendHookGood = true;
-    }
+	sendHook.Hook();
 
     return 0;
 }
@@ -250,19 +243,13 @@ DWORD __fastcall RecvHook(void* thisPTR, void* dummy, void* param1, CDataStore* 
     DumpPacket(SMSG, 0, 2, dataStore);
 
     // unhooks the recv function
-    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
+	recvHook.UnHook();
 
     // calls client's function so it can processes the packet
-    DWORD returnValue = RecvProto(recvAddress)(thisPTR, param1, dataStore);
+    DWORD returnValue = RecvProto(recvHook.GetAddress())(thisPTR, param1, dataStore);
 
     // hooks again to catch the next incoming packets also
-    HookManager::WriteBlock(recvAddress, machineCodeHookRecv);
-
-    if (!recvHookGood)
-    {
-        printf("Recv hook Classic is working.\n");
-        recvHookGood = true;
-    }
+	recvHook.Hook();
 
     return returnValue;
 }
@@ -273,19 +260,13 @@ DWORD __fastcall RecvHook_TBC(void* thisPTR, void* dummy, void* param1, CDataSto
     DumpPacket(SMSG, (DWORD)param3, 2, dataStore);
 
     // unhooks the recv function
-    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
+	recvHook.UnHook();
 
     // calls client's function so it can processes the packet
-    DWORD returnValue = RecvProto_TBC(recvAddress)(thisPTR, param1, dataStore, param3);
+    DWORD returnValue = RecvProto_TBC(recvHook.GetAddress())(thisPTR, param1, dataStore, param3);
 
     // hooks again to catch the next incoming packets also
-    HookManager::WriteBlock(recvAddress, machineCodeHookRecv);
-
-    if (!recvHookGood)
-    {
-        printf("Recv hook TBC is working.\n");
-        recvHookGood = true;
-    }
+	recvHook.Hook();
 
     return returnValue;
 }
@@ -296,19 +277,13 @@ DWORD __fastcall RecvHook_MOP(void* thisPTR, void* dummy, void* param1, CDataSto
     DumpPacket(SMSG, (DWORD)param3, 4, dataStore);
 
     // unhooks the recv function
-    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
+	recvHook.UnHook();
 
     // calls client's function so it can processes the packet
-    DWORD returnValue = RecvProto_MOP(recvAddress)(thisPTR, param1, dataStore, param3);
+    DWORD returnValue = RecvProto_MOP(recvHook.GetAddress())(thisPTR, param1, dataStore, param3);
 
     // hooks again to catch the next incoming packets also
-    HookManager::WriteBlock(recvAddress, machineCodeHookRecv);
-
-    if (!recvHookGood)
-    {
-        printf("Recv hook MOP is working.\n");
-        recvHookGood = true;
-    }
+	recvHook.Hook();
 
     return returnValue;
 }
@@ -319,19 +294,13 @@ DWORD __fastcall RecvHook_WOD(void* thisPTR, void* dummy, void* param1, void* pa
     DumpPacket(SMSG, (DWORD)param4, 4, dataStore);
 
     // unhooks the recv function
-    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
+	recvHook.UnHook();
 
     // calls client's function so it can processes the packet
-    DWORD returnValue = RecvProto_WOD(recvAddress)(thisPTR, param1, param2, dataStore, param4);
+    DWORD returnValue = RecvProto_WOD(recvHook.GetAddress())(thisPTR, param1, param2, dataStore, param4);
 
     // hooks again to catch the next incoming packets also
-    HookManager::WriteBlock(recvAddress, machineCodeHookRecv);
-
-    if (!recvHookGood)
-    {
-        printf("Recv hook WOD is working.\n");
-        recvHookGood = true;
-    }
+	recvHook.Hook();
 
     return returnValue;
 }

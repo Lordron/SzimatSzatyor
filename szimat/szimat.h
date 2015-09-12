@@ -19,10 +19,10 @@
 #include <Shlwapi.h>
 #include <cstdio>
 #include <ctime>
+#include <mutex>
 #include "ConsoleManager.h"
 #include "Shared.h"
-#include "HookManager.h"
-#include <mutex>
+#include "Injector.h"
 
 #define PKT_VERSION 0x0301
 #define SNIFFER_ID  15
@@ -55,39 +55,16 @@ DWORD __fastcall SendHook(void* thisPTR, void*, CDataStore*, DWORD);
 
 typedef DWORD(__thiscall *SendProto)(void*, void*, void*);
 
-// address of WoW's send function
-DWORD sendAddress = 0;
-// global storage for the "the hooking" machine code which
-// hooks client's send function
-BYTE machineCodeHookSend[JMP_INSTRUCTION_SIZE] = { 0 };
-// global storage which stores the
-// untouched first 5 bytes machine code from the client's send function
-BYTE defaultMachineCodeSend[JMP_INSTRUCTION_SIZE] = { 0 };
-
 // this function will be called when recv called in the client
-DWORD __fastcall RecvHook(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore);
+DWORD __fastcall RecvHook    (void* thisPTR, void* dummy, void* param1, CDataStore* dataStore);
 DWORD __fastcall RecvHook_TBC(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3);
 DWORD __fastcall RecvHook_MOP(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3);
 DWORD __fastcall RecvHook_WOD(void* thisPTR, void* dummy, void* param1, void* param2, CDataStore* dataStore, void* param4);
 
-typedef DWORD(__thiscall *RecvProto)(void*, void*, void*);
+typedef DWORD(__thiscall *RecvProto)    (void*, void*, void*);
 typedef DWORD(__thiscall *RecvProto_TBC)(void*, void*, void*, void*);
 typedef DWORD(__thiscall *RecvProto_MOP)(void*, void*, void*, void*);
 typedef DWORD(__thiscall *RecvProto_WOD)(void*, void*, void*, void*, void*);
-
-// address of WoW's recv function
-DWORD recvAddress = 0;
-// global storage for the "the hooking" machine code which
-// hooks client's recv function
-BYTE machineCodeHookRecv[JMP_INSTRUCTION_SIZE] = { 0 };
-// global storage which stores the
-// untouched first 5 bytes machine code from the client's recv function
-BYTE defaultMachineCodeRecv[JMP_INSTRUCTION_SIZE] = { 0 };
-
-// these are false if "hook functions" don't called yet
-// and they are true if already called at least once
-bool sendHookGood = false;
-bool recvHookGood = false;
 
 // basically this method controls what the sniffer should do
 // pretty much like a "main method"
@@ -96,15 +73,19 @@ DWORD MainThreadControl(LPVOID /* param */);
 char dllPath[MAX_PATH] = { 0 };
 FILE* fileDump = 0;
 
+Injector sendHook;
+Injector recvHook;
 
 typedef struct {
     WORD build;
-    DWORD_PTR proc;
+    LPVOID sendDetour;
+	LPVOID recvDetour;
+	PCHAR name;
 } ProtoEntry;
 
-const ProtoEntry RecvProtoTable[] = {
-    { 8606,   (DWORD_PTR)RecvHook     },
-    { 16135,  (DWORD_PTR)RecvHook_TBC },
-    { 18443,  (DWORD_PTR)RecvHook_MOP },
-    { 0xFFFF, (DWORD_PTR)RecvHook_WOD },
+const ProtoEntry HookTable[] = {
+    { 8606,   SendHook, RecvHook    , "Vanilla" },
+    { 16135,  SendHook, RecvHook_TBC, "TBC"     },
+    { 18443,  SendHook, RecvHook_MOP, "MOP"     },
+    { 0xFFFF, SendHook, RecvHook_WOD, "WOD"     },
 };
